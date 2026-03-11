@@ -65,6 +65,7 @@ public partial class WorldManager : Node3D
 		AddChild(_localPlayer);
 		_localPlayer.GlobalPosition = new Vector3(p.PosX, p.PosY, p.PosZ);
 		_localPlayer.Rotation = new Vector3(0, p.RotY, 0);
+		_localPlayer.ApplyColor(p.ColorHex ?? PlayerPrefs.LoadColorHex());
 
 		GD.Print($"[WorldManager] Local player spawned at ({p.PosX}, {p.PosY}, {p.PosZ})");
 	}
@@ -78,7 +79,8 @@ public partial class WorldManager : Node3D
 			{
 				if (player.Identity == GameManager.Instance.LocalIdentity)
 				{
-					// Local player updates are handled by PlayerController
+					// Apply color updates to local player
+					_localPlayer?.ApplyColor(player.ColorHex ?? PlayerPrefs.LoadColorHex());
 					return;
 				}
 
@@ -99,9 +101,10 @@ public partial class WorldManager : Node3D
 	{
 		string id = player.Identity.ToString();
 
+		string colorHex = player.ColorHex ?? "#E6804D";
 		if (_remotePlayers.TryGetValue(id, out var existing))
 		{
-			existing.UpdateFromServer(player.PosX, player.PosY, player.PosZ, player.RotY, player.Name);
+			existing.UpdateFromServer(player.PosX, player.PosY, player.PosZ, player.RotY, player.Name, colorHex);
 		}
 		else
 		{
@@ -110,6 +113,7 @@ public partial class WorldManager : Node3D
 				Name = $"Remote_{id[..8]}",
 				IdentityHex = id,
 				PlayerName = player.Name,
+				ColorHex = colorHex,
 			};
 			AddChild(remote);
 			remote.GlobalPosition = new Vector3(player.PosX, player.PosY, player.PosZ);

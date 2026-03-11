@@ -50,6 +50,7 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Col<Player, float> Stamina { get; }
         public global::SpacetimeDB.Col<Player, float> MaxStamina { get; }
         public global::SpacetimeDB.Col<Player, bool> IsOnline { get; }
+        public global::SpacetimeDB.Col<Player, string> ColorHex { get; }
 
         public PlayerCols(string tableName)
         {
@@ -64,6 +65,7 @@ namespace SpacetimeDB.Types
             Stamina = new global::SpacetimeDB.Col<Player, float>(tableName, "stamina");
             MaxStamina = new global::SpacetimeDB.Col<Player, float>(tableName, "max_stamina");
             IsOnline = new global::SpacetimeDB.Col<Player, bool>(tableName, "is_online");
+            ColorHex = new global::SpacetimeDB.Col<Player, string>(tableName, "color_hex");
         }
     }
 

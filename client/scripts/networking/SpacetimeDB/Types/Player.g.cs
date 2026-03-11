@@ -35,6 +35,8 @@ namespace SpacetimeDB.Types
         public float MaxStamina;
         [DataMember(Name = "is_online")]
         public bool IsOnline;
+        [DataMember(Name = "color_hex")]
+        public string ColorHex;
 
         public Player(
             SpacetimeDB.Identity Identity,
@@ -47,7 +49,8 @@ namespace SpacetimeDB.Types
             float MaxHealth,
             float Stamina,
             float MaxStamina,
-            bool IsOnline
+            bool IsOnline,
+            string ColorHex
         )
         {
             this.Identity = Identity;
@@ -61,11 +64,13 @@ namespace SpacetimeDB.Types
             this.Stamina = Stamina;
             this.MaxStamina = MaxStamina;
             this.IsOnline = IsOnline;
+            this.ColorHex = ColorHex;
         }
 
         public Player()
         {
             this.Name = "";
+            this.ColorHex = "";
         }
     }
 }

@@ -6,279 +6,287 @@ using System.Collections.Generic;
 
 namespace SandboxRPG;
 
+// =========================================================================
+// GAME STATE
+// =========================================================================
+
+public enum GameState
+{
+    Disconnected,
+    Connecting,
+    Connected,
+    CharacterSetup,
+    InGame,
+}
+
 /// <summary>
-/// Autoload singleton managing the SpacetimeDB connection.
-/// All game data flows through here - the single source of truth.
+/// Autoload singleton managing the SpacetimeDB connection and game state machine.
+/// UI reacts to StateChanged / ConnectionFailed signals — no direct coupling.
 /// </summary>
 public partial class GameManager : Node
 {
-	// === Configuration ===
-	[Export] public string ServerUrl = "http://127.0.0.1:3000";
-	[Export] public string ModuleName = "sandbox-rpg";
+    // === Configuration ===
+    [Export] public string ServerUrl = "http://127.0.0.1:3000";
+    [Export] public string ModuleName = "sandbox-rpg";
 
-	// === Connection State ===
-	public static GameManager Instance { get; private set; } = null!;
-	public DbConnection? Conn { get; private set; }
-	public Identity? LocalIdentity { get; private set; }
-	public new bool IsConnected { get; private set; }
+    // === Singleton ===
+    public static GameManager Instance { get; private set; } = null!;
 
-	// === Signals for Godot nodes to react ===
-	[Signal] public delegate void ConnectedEventHandler();
-	[Signal] public delegate void DisconnectedEventHandler();
-	[Signal] public delegate void SubscriptionAppliedEventHandler();
-	[Signal] public delegate void PlayerUpdatedEventHandler(string identityHex);
-	[Signal] public delegate void PlayerRemovedEventHandler(string identityHex);
-	[Signal] public delegate void ChatMessageReceivedEventHandler(string senderName, string text);
-	[Signal] public delegate void InventoryChangedEventHandler();
-	[Signal] public delegate void WorldItemChangedEventHandler();
-	[Signal] public delegate void StructureChangedEventHandler();
-	[Signal] public delegate void RecipesLoadedEventHandler();
+    // === Connection ===
+    public DbConnection? Conn { get; private set; }
+    public Identity? LocalIdentity { get; private set; }
+    public new bool IsConnected { get; private set; }
 
-	public override void _EnterTree()
-	{
-		Instance = this;
-	}
+    // === State machine ===
+    public GameState State { get; private set; } = GameState.Disconnected;
 
-	public override void _Ready()
-	{
-		GD.Print("[GameManager] Initializing SpacetimeDB connection...");
-		Connect();
-	}
+    // === Signals ===
+    [Signal] public delegate void StateChangedEventHandler(int state);   // cast to GameState
+    [Signal] public delegate void ConnectionFailedEventHandler(string reason);
+    [Signal] public delegate void ConnectedEventHandler();
+    [Signal] public delegate void DisconnectedEventHandler();
+    [Signal] public delegate void SubscriptionAppliedEventHandler();
+    [Signal] public delegate void PlayerUpdatedEventHandler(string identityHex);
+    [Signal] public delegate void PlayerRemovedEventHandler(string identityHex);
+    [Signal] public delegate void ChatMessageReceivedEventHandler(string senderName, string text);
+    [Signal] public delegate void InventoryChangedEventHandler();
+    [Signal] public delegate void WorldItemChangedEventHandler();
+    [Signal] public delegate void StructureChangedEventHandler();
+    [Signal] public delegate void RecipesLoadedEventHandler();
 
-	public override void _Process(double delta)
-	{
-		// Process incoming SpacetimeDB messages each frame
-		Conn?.FrameTick();
-	}
+    // =========================================================================
+    // GODOT LIFECYCLE
+    // =========================================================================
 
-	// =========================================================================
-	// CONNECTION
-	// =========================================================================
+    public override void _EnterTree()
+    {
+        Instance = this;
+    }
 
-	private void Connect()
-	{
-		try
-		{
-			Conn = DbConnection.Builder()
-				.WithUri(ServerUrl)
-				.WithDatabaseName(ModuleName)
-				.OnConnect(OnConnected)
-				.OnConnectError(OnConnectError)
-				.OnDisconnect(OnDisconnected)
-				.Build();
-		}
-		catch (Exception ex)
-		{
-			GD.PrintErr($"[GameManager] Failed to create connection: {ex.Message}");
-		}
-	}
+    public override void _Ready()
+    {
+        // Do NOT auto-connect — MainMenu drives the connection.
+        SetState(GameState.Disconnected);
+    }
 
-	private void OnConnected(DbConnection conn, Identity identity, string authToken)
-	{
-		GD.Print($"[GameManager] Connected! Identity: {identity}");
-		LocalIdentity = identity;
-		IsConnected = true;
+    public override void _Process(double delta)
+    {
+        Conn?.FrameTick();
+    }
 
-		// Save auth token for reconnection
-		SaveAuthToken(authToken);
+    // =========================================================================
+    // CONNECTION — PUBLIC API
+    // =========================================================================
 
-		// Register table callbacks
-		RegisterCallbacks(conn);
+    /// <summary>Connect using the saved auth token (same identity as last session).</summary>
+    public void Connect()
+    {
+        if (State == GameState.Connecting) return;
+        SetState(GameState.Connecting);
+        BuildConnection(LoadAuthToken());
+    }
 
-		// Subscribe to all public tables
-		conn.SubscriptionBuilder()
-			.OnApplied(OnSubscriptionApplied)
-			.OnError((ctx, err) => GD.PrintErr($"[GameManager] Subscription error: {err}"))
-			.SubscribeToAllTables();
+    /// <summary>Connect as a brand-new identity (delete saved token first).</summary>
+    public void ConnectFresh()
+    {
+        if (State == GameState.Connecting) return;
+        DeleteAuthToken();
+        SetState(GameState.Connecting);
+        BuildConnection(null);
+    }
 
-		EmitSignal(SignalName.Connected);
-	}
+    public bool HasSavedToken() => FileAccess.FileExists(AuthTokenPath);
 
-	private void OnConnectError(Exception error)
-	{
-		GD.PrintErr($"[GameManager] Connection error: {error.Message}");
-	}
+    // =========================================================================
+    // REDUCER CALLS — CLIENT → SERVER
+    // =========================================================================
 
-	private void OnDisconnected(DbConnection conn, Exception? error)
-	{
-		GD.Print("[GameManager] Disconnected from server.");
-		IsConnected = false;
-		EmitSignal(SignalName.Disconnected);
-	}
+    public void SetPlayerName(string name)    => Conn?.Reducers.SetName(name);
+    public void SetPlayerColor(string hex)    => Conn?.Reducers.SetColor(hex);
+    public void SendMovePlayer(float x, float y, float z, float rotY) => Conn?.Reducers.MovePlayer(x, y, z, rotY);
+    public void SendChatMessage(string text)  => Conn?.Reducers.SendChat(text);
+    public void PickupWorldItem(ulong id)     => Conn?.Reducers.PickupItem(id);
+    public void DropInventoryItem(ulong id, uint qty) => Conn?.Reducers.DropItem(id, qty);
+    public void CraftRecipe(ulong id)         => Conn?.Reducers.CraftItem(id);
+    public void PlaceBuildStructure(string type, float x, float y, float z, float rotY) => Conn?.Reducers.PlaceStructure(type, x, y, z, rotY);
+    public void RemoveBuildStructure(ulong id) => Conn?.Reducers.RemoveStructure(id);
+    public void MoveItemSlot(ulong id, int slot) => Conn?.Reducers.MoveItemToSlot(id, slot);
 
-	private void OnSubscriptionApplied(SubscriptionEventContext ctx)
-	{
-		GD.Print("[GameManager] Subscription applied - all data synced!");
-		EmitSignal(SignalName.SubscriptionApplied);
-	}
+    // =========================================================================
+    // DATA ACCESS — READ FROM STDB CLIENT CACHE
+    // =========================================================================
 
-	// =========================================================================
-	// TABLE CALLBACKS
-	// =========================================================================
+    public IEnumerable<Player> GetAllPlayers()
+    {
+        if (Conn == null) yield break;
+        foreach (var p in Conn.Db.Player.Iter()) yield return p;
+    }
 
-	private void RegisterCallbacks(DbConnection conn)
-	{
-		// Player table
-		conn.Db.Player.OnInsert += (ctx, player) =>
-		{
-			GD.Print($"[GameManager] Player joined: {player.Name}");
-			CallDeferred(nameof(EmitPlayerUpdated), player.Identity.ToString());
-		};
-		conn.Db.Player.OnUpdate += (ctx, oldPlayer, newPlayer) =>
-		{
-			CallDeferred(nameof(EmitPlayerUpdated), newPlayer.Identity.ToString());
-		};
-		conn.Db.Player.OnDelete += (ctx, player) =>
-		{
-			CallDeferred(nameof(EmitPlayerRemoved), player.Identity.ToString());
-		};
+    public Player? GetLocalPlayer()
+    {
+        if (Conn == null || LocalIdentity == null) return null;
+        return Conn.Db.Player.Identity.Find(LocalIdentity.Value);
+    }
 
-		// Chat messages
-		conn.Db.ChatMessage.OnInsert += (ctx, msg) =>
-		{
-			CallDeferred(nameof(EmitChatMessage), msg.SenderName, msg.Text);
-		};
+    public IEnumerable<InventoryItem> GetMyInventory()
+    {
+        if (Conn == null || LocalIdentity == null) yield break;
+        foreach (var item in Conn.Db.InventoryItem.Iter())
+            if (item.OwnerId == LocalIdentity.Value)
+                yield return item;
+    }
 
-		// Inventory
-		conn.Db.InventoryItem.OnInsert += (ctx, item) => CallDeferred(nameof(EmitInventoryChanged));
-		conn.Db.InventoryItem.OnUpdate += (ctx, _, _) => CallDeferred(nameof(EmitInventoryChanged));
-		conn.Db.InventoryItem.OnDelete += (ctx, _) => CallDeferred(nameof(EmitInventoryChanged));
+    public IEnumerable<WorldItem>      GetAllWorldItems() { if (Conn != null) foreach (var i in Conn.Db.WorldItem.Iter())        yield return i; }
+    public IEnumerable<PlacedStructure> GetAllStructures() { if (Conn != null) foreach (var s in Conn.Db.PlacedStructure.Iter()) yield return s; }
+    public IEnumerable<CraftingRecipe> GetAllRecipes()    { if (Conn != null) foreach (var r in Conn.Db.CraftingRecipe.Iter())   yield return r; }
 
-		// World items
-		conn.Db.WorldItem.OnInsert += (ctx, _) => CallDeferred(nameof(EmitWorldItemChanged));
-		conn.Db.WorldItem.OnDelete += (ctx, _) => CallDeferred(nameof(EmitWorldItemChanged));
+    // =========================================================================
+    // PRIVATE — CONNECTION IMPLEMENTATION
+    // =========================================================================
 
-		// Structures
-		conn.Db.PlacedStructure.OnInsert += (ctx, _) => CallDeferred(nameof(EmitStructureChanged));
-		conn.Db.PlacedStructure.OnUpdate += (ctx, _, _) => CallDeferred(nameof(EmitStructureChanged));
-		conn.Db.PlacedStructure.OnDelete += (ctx, _) => CallDeferred(nameof(EmitStructureChanged));
+    private void BuildConnection(string? savedToken)
+    {
+        try
+        {
+            var builder = DbConnection.Builder()
+                .WithUri(ServerUrl)
+                .WithDatabaseName(ModuleName)
+                .OnConnect(OnConnected)
+                .OnConnectError(OnConnectError)
+                .OnDisconnect(OnDisconnected);
 
-		// Recipes
-		conn.Db.CraftingRecipe.OnInsert += (ctx, _) => CallDeferred(nameof(EmitRecipesLoaded));
-	}
+            if (!string.IsNullOrEmpty(savedToken))
+                builder = builder.WithToken(savedToken);
 
-	// Deferred signal emitters (thread-safe)
-	private void EmitPlayerUpdated(string id) => EmitSignal(SignalName.PlayerUpdated, id);
-	private void EmitPlayerRemoved(string id) => EmitSignal(SignalName.PlayerRemoved, id);
-	private void EmitChatMessage(string name, string text) => EmitSignal(SignalName.ChatMessageReceived, name, text);
-	private void EmitInventoryChanged() => EmitSignal(SignalName.InventoryChanged);
-	private void EmitWorldItemChanged() => EmitSignal(SignalName.WorldItemChanged);
-	private void EmitStructureChanged() => EmitSignal(SignalName.StructureChanged);
-	private void EmitRecipesLoaded() => EmitSignal(SignalName.RecipesLoaded);
+            Conn = builder.Build();
+        }
+        catch (Exception ex)
+        {
+            GD.PrintErr($"[GameManager] Failed to create connection: {ex.Message}");
+            SetState(GameState.Disconnected);
+            EmitSignal(SignalName.ConnectionFailed, ex.Message);
+        }
+    }
 
-	// =========================================================================
-	// REDUCER CALLS (Client → Server)
-	// =========================================================================
+    private void OnConnected(DbConnection conn, Identity identity, string authToken)
+    {
+        GD.Print($"[GameManager] Connected! Identity: {identity}");
+        LocalIdentity = identity;
+        IsConnected = true;
+        SaveAuthToken(authToken);
+        SetState(GameState.Connected);
 
-	public void SetPlayerName(string name)
-	{
-		Conn?.Reducers.SetName(name);
-	}
+        RegisterCallbacks(conn);
 
-	public void SendMovePlayer(float x, float y, float z, float rotY)
-	{
-		Conn?.Reducers.MovePlayer(x, y, z, rotY);
-	}
+        conn.SubscriptionBuilder()
+            .OnApplied(OnSubscriptionApplied)
+            .OnError((ctx, err) => GD.PrintErr($"[GameManager] Subscription error: {err}"))
+            .SubscribeToAllTables();
 
-	public void SendChatMessage(string text)
-	{
-		Conn?.Reducers.SendChat(text);
-	}
+        EmitSignal(SignalName.Connected);
+    }
 
-	public void PickupWorldItem(ulong worldItemId)
-	{
-		Conn?.Reducers.PickupItem(worldItemId);
-	}
+    private void OnConnectError(Exception error)
+    {
+        GD.PrintErr($"[GameManager] Connection error: {error.Message}");
+        IsConnected = false;
+        SetState(GameState.Disconnected);
+        EmitSignal(SignalName.ConnectionFailed, error.Message);
+    }
 
-	public void DropInventoryItem(ulong inventoryItemId, uint quantity)
-	{
-		Conn?.Reducers.DropItem(inventoryItemId, quantity);
-	}
+    private void OnDisconnected(DbConnection conn, Exception? error)
+    {
+        GD.Print("[GameManager] Disconnected from server.");
+        IsConnected = false;
+        SetState(GameState.Disconnected);
+        EmitSignal(SignalName.Disconnected);
+    }
 
-	public void CraftRecipe(ulong recipeId)
-	{
-		Conn?.Reducers.CraftItem(recipeId);
-	}
+    private void OnSubscriptionApplied(SubscriptionEventContext ctx)
+    {
+        GD.Print("[GameManager] Subscription applied - all data synced!");
 
-	public void PlaceBuildStructure(string structureType, float x, float y, float z, float rotY)
-	{
-		Conn?.Reducers.PlaceStructure(structureType, x, y, z, rotY);
-	}
+        var player = GetLocalPlayer();
+        var nextState = (player == null || player.Name.StartsWith("Player_"))
+            ? GameState.CharacterSetup
+            : GameState.InGame;
 
-	public void RemoveBuildStructure(ulong structureId)
-	{
-		Conn?.Reducers.RemoveStructure(structureId);
-	}
+        SetState(nextState);
+        EmitSignal(SignalName.SubscriptionApplied);
+    }
 
-	public void MoveItemSlot(ulong itemId, int slot)
-	{
-		Conn?.Reducers.MoveItemToSlot(itemId, slot);
-	}
+    private void SetState(GameState newState)
+    {
+        if (State == newState) return;
+        State = newState;
+        GD.Print($"[GameManager] State → {newState}");
+        EmitSignal(SignalName.StateChanged, (int)newState);
+    }
 
-	// =========================================================================
-	// DATA ACCESS (Read from SpacetimeDB client cache)
-	// =========================================================================
+    // =========================================================================
+    // TABLE CALLBACKS
+    // =========================================================================
 
-	public IEnumerable<Player> GetAllPlayers()
-	{
-		if (Conn == null) yield break;
-		foreach (var p in Conn.Db.Player.Iter())
-			yield return p;
-	}
+    private void RegisterCallbacks(DbConnection conn)
+    {
+        conn.Db.Player.OnInsert += (ctx, player) =>
+        {
+            GD.Print($"[GameManager] Player joined: {player.Name}");
+            CallDeferred(nameof(EmitPlayerUpdated), player.Identity.ToString());
+        };
+        conn.Db.Player.OnUpdate += (ctx, _, newPlayer) =>
+            CallDeferred(nameof(EmitPlayerUpdated), newPlayer.Identity.ToString());
+        conn.Db.Player.OnDelete += (ctx, player) =>
+            CallDeferred(nameof(EmitPlayerRemoved), player.Identity.ToString());
 
-	public Player? GetLocalPlayer()
-	{
-		if (Conn == null || LocalIdentity == null) return null;
-		return Conn.Db.Player.Identity.Find(LocalIdentity.Value);
-	}
+        conn.Db.ChatMessage.OnInsert += (ctx, msg) =>
+            CallDeferred(nameof(EmitChatMessage), msg.SenderName, msg.Text);
 
-	public IEnumerable<InventoryItem> GetMyInventory()
-	{
-		if (Conn == null || LocalIdentity == null) yield break;
-		foreach (var item in Conn.Db.InventoryItem.Iter())
-		{
-			if (item.OwnerId == LocalIdentity.Value)
-				yield return item;
-		}
-	}
+        conn.Db.InventoryItem.OnInsert += (ctx, _) => CallDeferred(nameof(EmitInventoryChanged));
+        conn.Db.InventoryItem.OnUpdate += (ctx, _, _) => CallDeferred(nameof(EmitInventoryChanged));
+        conn.Db.InventoryItem.OnDelete += (ctx, _) => CallDeferred(nameof(EmitInventoryChanged));
 
-	public IEnumerable<WorldItem> GetAllWorldItems()
-	{
-		if (Conn == null) yield break;
-		foreach (var item in Conn.Db.WorldItem.Iter())
-			yield return item;
-	}
+        conn.Db.WorldItem.OnInsert += (ctx, _) => CallDeferred(nameof(EmitWorldItemChanged));
+        conn.Db.WorldItem.OnDelete += (ctx, _) => CallDeferred(nameof(EmitWorldItemChanged));
 
-	public IEnumerable<PlacedStructure> GetAllStructures()
-	{
-		if (Conn == null) yield break;
-		foreach (var s in Conn.Db.PlacedStructure.Iter())
-			yield return s;
-	}
+        conn.Db.PlacedStructure.OnInsert += (ctx, _) => CallDeferred(nameof(EmitStructureChanged));
+        conn.Db.PlacedStructure.OnUpdate += (ctx, _, _) => CallDeferred(nameof(EmitStructureChanged));
+        conn.Db.PlacedStructure.OnDelete += (ctx, _) => CallDeferred(nameof(EmitStructureChanged));
 
-	public IEnumerable<CraftingRecipe> GetAllRecipes()
-	{
-		if (Conn == null) yield break;
-		foreach (var r in Conn.Db.CraftingRecipe.Iter())
-			yield return r;
-	}
+        conn.Db.CraftingRecipe.OnInsert += (ctx, _) => CallDeferred(nameof(EmitRecipesLoaded));
+    }
 
-	// =========================================================================
-	// AUTH TOKEN PERSISTENCE
-	// =========================================================================
+    // Deferred signal emitters (thread-safe hop back to main thread)
+    private void EmitPlayerUpdated(string id)  => EmitSignal(SignalName.PlayerUpdated, id);
+    private void EmitPlayerRemoved(string id)  => EmitSignal(SignalName.PlayerRemoved, id);
+    private void EmitChatMessage(string n, string t) => EmitSignal(SignalName.ChatMessageReceived, n, t);
+    private void EmitInventoryChanged()        => EmitSignal(SignalName.InventoryChanged);
+    private void EmitWorldItemChanged()        => EmitSignal(SignalName.WorldItemChanged);
+    private void EmitStructureChanged()        => EmitSignal(SignalName.StructureChanged);
+    private void EmitRecipesLoaded()           => EmitSignal(SignalName.RecipesLoaded);
 
-	private const string AuthTokenPath = "user://spacetimedb_auth.token";
+    // =========================================================================
+    // AUTH TOKEN PERSISTENCE
+    // =========================================================================
 
-	private void SaveAuthToken(string token)
-	{
-		using var file = FileAccess.Open(AuthTokenPath, FileAccess.ModeFlags.Write);
-		file?.StoreString(token);
-	}
+    private const string AuthTokenPath = "user://spacetimedb_auth.token";
 
-	private string? LoadAuthToken()
-	{
-		if (!FileAccess.FileExists(AuthTokenPath)) return null;
-		using var file = FileAccess.Open(AuthTokenPath, FileAccess.ModeFlags.Read);
-		return file?.GetAsText();
-	}
+    private void SaveAuthToken(string token)
+    {
+        using var file = FileAccess.Open(AuthTokenPath, FileAccess.ModeFlags.Write);
+        file?.StoreString(token);
+    }
+
+    private string? LoadAuthToken()
+    {
+        if (!FileAccess.FileExists(AuthTokenPath)) return null;
+        using var file = FileAccess.Open(AuthTokenPath, FileAccess.ModeFlags.Read);
+        return file?.GetAsText();
+    }
+
+    private void DeleteAuthToken()
+    {
+        if (FileAccess.FileExists(AuthTokenPath))
+            DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(AuthTokenPath));
+    }
 }

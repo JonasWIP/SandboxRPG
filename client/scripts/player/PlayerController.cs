@@ -25,6 +25,7 @@ public partial class PlayerController : CharacterBody3D
     private Camera3D _camera = null!;
     private Node3D _cameraMount = null!;
     private MeshInstance3D _mesh = null!;
+    private StandardMaterial3D _material = null!;
     private float _sendTimer;
     private Vector3 _lastSentPosition;
     private float _lastSentRotation;
@@ -53,13 +54,10 @@ public partial class PlayerController : CharacterBody3D
         _mesh.Mesh = capsule;
         _mesh.Position = new Vector3(0, 0.9f, 0);
 
-        // Create stylized material
-        var material = new StandardMaterial3D
-        {
-            AlbedoColor = new Color(0.3f, 0.7f, 0.9f),
-            Roughness = 0.8f,
-        };
-        _mesh.MaterialOverride = material;
+        // Create material — color loaded from local prefs
+        _material = new StandardMaterial3D { Roughness = 0.8f };
+        _mesh.MaterialOverride = _material;
+        ApplyColor(PlayerPrefs.LoadColorHex());
 
         // Create collision shape
         var collision = new CollisionShape3D { Name = "CollisionShape" };
@@ -87,13 +85,15 @@ public partial class PlayerController : CharacterBody3D
             _cameraMount.Rotation = new Vector3(_cameraRotationX, 0, 0);
         }
 
-        // Toggle mouse capture
-        if (@event.IsActionPressed("ui_cancel"))
-        {
-            Input.MouseMode = Input.MouseMode == Input.MouseModeEnum.Captured
-                ? Input.MouseModeEnum.Visible
-                : Input.MouseModeEnum.Captured;
-        }
+        // ESC is handled by HUD (opens Settings overlay)
+    }
+
+    /// <summary>Update the local player's mesh colour (called by WorldManager on server update).</summary>
+    public void ApplyColor(string colorHex)
+    {
+        if (_material is null) return;
+        if (Color.HtmlIsValid(colorHex))
+            _material.AlbedoColor = new Color(colorHex);
     }
 
     public override void _PhysicsProcess(double delta)

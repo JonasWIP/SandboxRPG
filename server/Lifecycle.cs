@@ -45,6 +45,7 @@ public static partial class Module
                 Stamina = 100f,
                 MaxStamina = 100f,
                 IsOnline = true,
+                ColorHex = "#3CB4E5",
             });
 
             // Give starter tools

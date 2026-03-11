@@ -636,6 +636,7 @@ namespace SpacetimeDB.Types
                 Reducer.PlaceStructure args => Reducers.InvokePlaceStructure(eventContext, args),
                 Reducer.RemoveStructure args => Reducers.InvokeRemoveStructure(eventContext, args),
                 Reducer.SendChat args => Reducers.InvokeSendChat(eventContext, args),
+                Reducer.SetColor args => Reducers.InvokeSetColor(eventContext, args),
                 Reducer.SetName args => Reducers.InvokeSetName(eventContext, args),
                 _ => throw new ArgumentOutOfRangeException("Reducer", $"Unknown reducer {reducer}")
             };

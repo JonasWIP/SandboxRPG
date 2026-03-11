@@ -25,6 +25,21 @@ public static partial class Module
     }
 
     [Reducer]
+    public static void SetColor(ReducerContext ctx, string colorHex)
+    {
+        if (string.IsNullOrWhiteSpace(colorHex) || colorHex.Length > 9)
+            throw new Exception("Invalid color hex.");
+
+        var existing = ctx.Db.Player.Identity.Find(ctx.Sender);
+        if (existing is not null)
+        {
+            var player = existing.Value;
+            player.ColorHex = colorHex;
+            ctx.Db.Player.Identity.Update(player);
+        }
+    }
+
+    [Reducer]
     public static void MovePlayer(ReducerContext ctx, float posX, float posY, float posZ, float rotY)
     {
         var existing = ctx.Db.Player.Identity.Find(ctx.Sender);

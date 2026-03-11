@@ -25,6 +25,7 @@ public static partial class Module
         public float Stamina;
         public float MaxStamina;
         public bool IsOnline;
+        public string ColorHex; // e.g. "#3CB4E5"
     }
 
     /// <summary>Inventory items belonging to players. Slot -1 = bag, 0–8 = hotbar.</summary>

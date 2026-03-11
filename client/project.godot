@@ -16,13 +16,14 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 config/name="SandboxRPG"
 config/description="Multiplayer Sandbox RPG mit SpacetimeDB 2.0"
-run/main_scene="res://scenes/Main.tscn"
+run/main_scene="res://scenes/MainMenu.tscn"
 config/features=PackedStringArray("4.6", "C#", "Forward Plus")
 config/icon="res://icon.svg"
 
 [autoload]
 
 GameManager="*res://scripts/networking/GameManager.cs"
+SceneRouter="*res://scripts/networking/SceneRouter.cs"
 
 [display]
 
