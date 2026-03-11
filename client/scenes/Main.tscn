@@ -1,0 +1,95 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/WorldManager.cs" id="1_world"]
+[ext_resource type="Script" path="res://scripts/world/InteractionSystem.cs" id="2_interact"]
+[ext_resource type="Script" path="res://scripts/building/BuildSystem.cs" id="3_build"]
+[ext_resource type="Script" path="res://scripts/ui/ChatUI.cs" id="4_chat"]
+[ext_resource type="Script" path="res://scripts/ui/InventoryUI.cs" id="5_inv"]
+[ext_resource type="Script" path="res://scripts/ui/CraftingUI.cs" id="6_craft"]
+[ext_resource type="Script" path="res://scripts/ui/HUD.cs" id="7_hud"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_ground"]
+size = Vector2(100, 100)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ground"]
+size = Vector3(100, 0.1, 100)
+
+[sub_resource type="StandardMaterial3D" id="Material_ground"]
+albedo_color = Color(0.35, 0.55, 0.3, 1)
+roughness = 0.95
+
+[sub_resource type="Environment" id="Environment_world"]
+background_mode = 2
+background_color = Color(0.45, 0.65, 0.85, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.7, 0.75, 0.85, 1)
+ambient_light_energy = 0.4
+tonemap_mode = 2
+fog_enabled = true
+fog_light_color = Color(0.6, 0.7, 0.85, 1)
+fog_density = 0.002
+fog_sky_affect = 0.5
+
+[node name="Main" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_world")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.866, -0.354, 0.354, 0, 0.707, 0.707, -0.5, -0.612, 0.612, 0, 15, 0)
+light_color = Color(1, 0.95, 0.85, 1)
+light_energy = 1.2
+shadow_enabled = true
+
+[node name="Ground" type="StaticBody3D" parent="."]
+
+[node name="GroundMesh" type="MeshInstance3D" parent="Ground"]
+mesh = SubResource("PlaneMesh_ground")
+surface_material_override/0 = SubResource("Material_ground")
+
+[node name="GroundCollision" type="CollisionShape3D" parent="Ground"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
+shape = SubResource("BoxShape3D_ground")
+
+[node name="WorldManager" type="Node3D" parent="."]
+script = ExtResource("1_world")
+
+[node name="InteractionSystem" type="Node" parent="."]
+script = ExtResource("2_interact")
+
+[node name="BuildSystem" type="Node" parent="."]
+script = ExtResource("3_build")
+
+[node name="UILayer" type="CanvasLayer" parent="."]
+
+[node name="HUD" type="Control" parent="UILayer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("7_hud")
+
+[node name="ChatUI" type="Control" parent="UILayer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("4_chat")
+
+[node name="InventoryUI" type="Control" parent="UILayer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("5_inv")
+
+[node name="CraftingUI" type="Control" parent="UILayer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+script = ExtResource("6_craft")

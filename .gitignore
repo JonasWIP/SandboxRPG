@@ -1,0 +1,42 @@
+# =============================================
+# Godot
+# =============================================
+.godot/
+export_presets.cfg
+*.mono/
+data_*/
+
+# =============================================
+# .NET / C#
+# =============================================
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.DotSettings.user
+
+# =============================================
+# SpacetimeDB client-generated bindings
+# (regenerate with: spacetime generate ...)
+# =============================================
+# Uncomment if you prefer not to track generated files:
+# client/scripts/networking/SpacetimeDB/
+
+# =============================================
+# OS / Editor
+# =============================================
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+
+# =============================================
+# Build artifacts
+# =============================================
+server/bin/
+server/obj/
+client/.godot/
+client/bin/
+client/obj/
