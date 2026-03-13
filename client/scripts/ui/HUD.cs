@@ -4,17 +4,15 @@ using SpacetimeDB.Types;
 namespace SandboxRPG;
 
 /// <summary>
-/// Heads-up display — health, stamina, crosshair, player info, and Settings overlay.
-/// ESC opens the Settings panel; the PlayerController no longer handles ESC.
+/// Heads-up display — health, stamina, crosshair, connection status, player info, and Hotbar.
+/// ESC is now owned by UIManager; HUD only shows always-on UI elements.
 /// </summary>
 public partial class HUD : Control
 {
-    private Label _statusLabel = null!;
-    private ProgressBar _healthBar = null!;
-    private ProgressBar _staminaBar = null!;
-    private Label _crosshair = null!;
-    private Label _playerInfoLabel = null!;
-    private SettingsUI? _settingsOverlay;
+    private Label       _statusLabel      = null!;
+    private ProgressBar _healthBar        = null!;
+    private ProgressBar _staminaBar       = null!;
+    private Label       _playerInfoLabel  = null!;
 
     public override void _Ready()
     {
@@ -24,10 +22,12 @@ public partial class HUD : Control
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (@event.IsActionPressed("ui_cancel"))
+        if (@event is not InputEventKey key || !key.Pressed || key.Echo) return;
+
+        // I or C → toggle the combined Inventory + Crafting panel
+        if (key.PhysicalKeycode is Key.I or Key.C)
         {
-            if (_settingsOverlay is not null) return; // already open
-            OpenSettings();
+            UIManager.Instance.Toggle<InventoryCraftingPanel>();
             GetViewport().SetInputAsHandled();
         }
     }
@@ -38,58 +38,43 @@ public partial class HUD : Control
 
     private void BuildUI()
     {
-        // Crosshair
-        _crosshair = new Label
+        // Crosshair (centre)
+        var crosshair = new Label
         {
             Text = "+",
             HorizontalAlignment = HorizontalAlignment.Center,
-            VerticalAlignment = VerticalAlignment.Center,
-            LayoutMode = 1,
-            AnchorsPreset = (int)LayoutPreset.Center,
+            VerticalAlignment   = VerticalAlignment.Center,
+            LayoutMode          = 1,
+            AnchorsPreset       = (int)LayoutPreset.Center,
         };
-        _crosshair.AddThemeColorOverride("font_color", new Color(1, 1, 1, 0.6f));
-        _crosshair.AddThemeFontSizeOverride("font_size", 24);
-        AddChild(_crosshair);
+        crosshair.AddThemeColorOverride("font_color", new Color(1, 1, 1, 0.6f));
+        crosshair.AddThemeFontSizeOverride("font_size", 24);
+        AddChild(crosshair);
 
         // Connection status (top right)
         _statusLabel = new Label
         {
             Text = "Connecting...",
             HorizontalAlignment = HorizontalAlignment.Right,
-            LayoutMode = 1,
-            AnchorsPreset = (int)LayoutPreset.TopRight,
-            OffsetLeft   = -250,
-            OffsetTop    = 10,
-            OffsetRight  = -10,
+            LayoutMode          = 1,
+            AnchorsPreset       = (int)LayoutPreset.TopRight,
+            OffsetLeft          = -250,
+            OffsetTop           = 10,
+            OffsetRight         = -10,
         };
         _statusLabel.AddThemeColorOverride("font_color", new Color(1, 0.8f, 0.2f));
         _statusLabel.AddThemeFontSizeOverride("font_size", 14);
         AddChild(_statusLabel);
 
-        // Settings button (top right, below status)
-        var settingsBtn = new Button
-        {
-            Text = "⚙ Settings",
-            LayoutMode = 1,
-            AnchorsPreset = (int)LayoutPreset.TopRight,
-            OffsetLeft  = -130,
-            OffsetTop   = 34,
-            OffsetRight = -10,
-            OffsetBottom = 62,
-        };
-        settingsBtn.AddThemeFontSizeOverride("font_size", 13);
-        settingsBtn.Pressed += OpenSettings;
-        AddChild(settingsBtn);
-
-        // Health / stamina bars (bottom left)
+        // Health / stamina bars (bottom left, above hotbar)
         var barsContainer = new VBoxContainer
         {
-            LayoutMode = 1,
+            LayoutMode    = 1,
             AnchorsPreset = (int)LayoutPreset.BottomLeft,
-            OffsetLeft   = 20,
-            OffsetBottom = -20,
-            OffsetTop    = -80,
-            OffsetRight  = 220,
+            OffsetLeft    = 20,
+            OffsetBottom  = -90,   // sit above the hotbar
+            OffsetTop     = -170,
+            OffsetRight   = 220,
         };
         AddChild(barsContainer);
 
@@ -122,15 +107,19 @@ public partial class HUD : Control
         // Player info (top left)
         _playerInfoLabel = new Label
         {
-            Text = "",
-            LayoutMode = 1,
+            Text          = "",
+            LayoutMode    = 1,
             AnchorsPreset = (int)LayoutPreset.TopLeft,
-            OffsetLeft = 10,
-            OffsetTop  = 30,
+            OffsetLeft    = 10,
+            OffsetTop     = 30,
         };
         _playerInfoLabel.AddThemeColorOverride("font_color", new Color(1, 1, 1, 0.8f));
         _playerInfoLabel.AddThemeFontSizeOverride("font_size", 14);
         AddChild(_playerInfoLabel);
+
+        // Hotbar (always visible, bottom centre)
+        var hotbar = new Hotbar();
+        AddChild(hotbar);
     }
 
     private void ConnectSignals()
@@ -158,9 +147,9 @@ public partial class HUD : Control
         var player = GameManager.Instance.GetLocalPlayer();
         if (player != null)
         {
-            _healthBar.Value  = player.Health;
+            _healthBar.Value     = player.Health;
             _healthBar.MaxValue  = player.MaxHealth;
-            _staminaBar.Value = player.Stamina;
+            _staminaBar.Value    = player.Stamina;
             _staminaBar.MaxValue = player.MaxStamina;
             _playerInfoLabel.Text = $"{player.Name}\nPos: ({player.PosX:F1}, {player.PosY:F1}, {player.PosZ:F1})";
         }
@@ -171,21 +160,5 @@ public partial class HUD : Control
 
         if (GameManager.Instance.IsConnected)
             _statusLabel.Text = $"Online ({onlineCount} players)";
-    }
-
-    // =========================================================================
-    // SETTINGS OVERLAY
-    // =========================================================================
-
-    private void OpenSettings()
-    {
-        if (_settingsOverlay is not null) return;
-
-        // Show cursor so the player can interact with the UI
-        Input.MouseMode = Input.MouseModeEnum.Visible;
-
-        _settingsOverlay = new SettingsUI { ReturnToMenu = false };
-        _settingsOverlay.TreeExited += () => _settingsOverlay = null;
-        AddChild(_settingsOverlay);
     }
 }

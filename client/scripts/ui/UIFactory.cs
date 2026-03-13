@@ -122,4 +122,88 @@ public static class UIFactory
         host.AddChild(content);
         return host;
     }
+
+    // =========================================================================
+    // INVENTORY / HOTBAR SLOTS
+    // =========================================================================
+
+    public static readonly Color ColourSlotBg       = new Color(0.12f, 0.13f, 0.17f, 0.95f);
+    public static readonly Color ColourSlotActive   = new Color("#3CB4E5");
+    public static readonly Color ColourSlotBorder   = new Color(0.25f, 0.27f, 0.32f, 1f);
+    public static readonly Vector2 SlotSize         = new Vector2(60, 60);
+
+    /// <summary>Square inventory slot button with coloured item indicator and label.</summary>
+    public static Button MakeSlotButton(string itemName, uint qty, Color itemColour)
+    {
+        var btn = new Button();
+        btn.CustomMinimumSize = SlotSize;
+        btn.ClipContents = true;
+
+        // Item colour square (top-left)
+        var dot = new ColorRect
+        {
+            Color = itemColour,
+            CustomMinimumSize = new Vector2(10, 10),
+            OffsetLeft = 4, OffsetTop = 4, OffsetRight = 14, OffsetBottom = 14,
+        };
+        btn.AddChild(dot);
+
+        // Item name
+        var nameLbl = new Label
+        {
+            Text = itemName.Replace('_', ' '),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            AutowrapMode = TextServer.AutowrapMode.WordSmart,
+        };
+        nameLbl.AddThemeFontSizeOverride("font_size", 10);
+        nameLbl.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        btn.AddChild(nameLbl);
+
+        // Qty badge (bottom-right)
+        var qtyLbl = new Label
+        {
+            Text = qty > 1 ? $"×{qty}" : "",
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Bottom,
+        };
+        qtyLbl.AddThemeFontSizeOverride("font_size", 10);
+        qtyLbl.AddThemeColorOverride("font_color", ColourMuted);
+        qtyLbl.SetAnchorsPreset(Control.LayoutPreset.BottomRight);
+        qtyLbl.OffsetLeft = -30; qtyLbl.OffsetTop = -18;
+        btn.AddChild(qtyLbl);
+
+        return btn;
+    }
+
+    /// <summary>Hotbar slot panel. Pass active=true to highlight with accent border.</summary>
+    public static PanelContainer MakeHotbarSlot(bool active = false)
+    {
+        var panel = new PanelContainer();
+        panel.CustomMinimumSize = SlotSize;
+
+        var style = new StyleBoxFlat
+        {
+            BgColor = ColourSlotBg,
+            BorderWidthBottom = 2, BorderWidthTop = 2,
+            BorderWidthLeft = 2, BorderWidthRight = 2,
+            BorderColor = active ? ColourSlotActive : ColourSlotBorder,
+            CornerRadiusTopLeft = 4, CornerRadiusTopRight = 4,
+            CornerRadiusBottomLeft = 4, CornerRadiusBottomRight = 4,
+        };
+        panel.AddThemeStyleboxOverride("panel", style);
+        return panel;
+    }
+
+    /// <summary>
+    /// Small context-menu popup at the given viewport position.
+    /// Caller adds buttons as children and must call QueueFree() when done.
+    /// </summary>
+    public static PanelContainer MakeContextMenu(Vector2 screenPos)
+    {
+        var panel = new PanelContainer();
+        panel.Position = screenPos;
+        // Adjust so menu doesn't go offscreen (caller can refine)
+        return panel;
+    }
 }

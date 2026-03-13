@@ -1,12 +1,10 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/WorldManager.cs" id="1_world"]
 [ext_resource type="Script" path="res://scripts/world/InteractionSystem.cs" id="2_interact"]
 [ext_resource type="Script" path="res://scripts/building/BuildSystem.cs" id="3_build"]
 [ext_resource type="Script" path="res://scripts/ui/ChatUI.cs" id="4_chat"]
-[ext_resource type="Script" path="res://scripts/ui/InventoryUI.cs" id="5_inv"]
-[ext_resource type="Script" path="res://scripts/ui/CraftingUI.cs" id="6_craft"]
-[ext_resource type="Script" path="res://scripts/ui/HUD.cs" id="7_hud"]
+[ext_resource type="Script" path="res://scripts/ui/HUD.cs" id="5_hud"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_ground"]
 size = Vector2(100, 100)
@@ -68,7 +66,7 @@ anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
-script = ExtResource("7_hud")
+script = ExtResource("5_hud")
 
 [node name="ChatUI" type="Control" parent="UILayer"]
 layout_mode = 1
@@ -77,19 +75,3 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 mouse_filter = 2
 script = ExtResource("4_chat")
-
-[node name="InventoryUI" type="Control" parent="UILayer"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-mouse_filter = 2
-script = ExtResource("5_inv")
-
-[node name="CraftingUI" type="Control" parent="UILayer"]
-layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-mouse_filter = 2
-script = ExtResource("6_craft")

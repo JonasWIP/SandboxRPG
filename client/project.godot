@@ -24,6 +24,7 @@ config/icon="res://icon.svg"
 
 GameManager="*res://scripts/networking/GameManager.cs"
 SceneRouter="*res://scripts/networking/SceneRouter.cs"
+UIManager="*res://scripts/ui/UIManager.cs"
 
 [display]
 

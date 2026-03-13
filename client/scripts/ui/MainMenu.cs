@@ -120,9 +120,7 @@ public partial class MainMenu : Control
 
     private void OnSettingsPressed()
     {
-        var settings = new SettingsUI();
-        settings.ReturnToMenu = true;
-        AddChild(settings);
+        UIManager.Instance.Push(new SettingsUI());
     }
 
     // =========================================================================

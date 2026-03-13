@@ -44,17 +44,21 @@ public partial class BuildSystem : Node
 	{
 		_camera ??= GetViewport()?.GetCamera3D();
 
+		// Block all build input while any UI panel is open
+		if (UIManager.Instance.IsAnyOpen)
+		{
+			ClearGhost();
+			return;
+		}
+
 		// Toggle build mode
 		if (Input.IsActionJustPressed("build_mode"))
 		{
 			_buildMode = !_buildMode;
 			UpdateBuildModeUI();
 
-			if (!_buildMode && _ghostPreview != null)
-			{
-				_ghostPreview.QueueFree();
-				_ghostPreview = null;
-			}
+			if (!_buildMode)
+				ClearGhost();
 		}
 
 		if (!_buildMode) return;
@@ -168,16 +172,19 @@ public partial class BuildSystem : Node
 		GetParent().AddChild(_ghostPreview);
 	}
 
-	private void RecreateGhost()
+	private void ClearGhost()
 	{
 		if (_ghostPreview != null)
 		{
-			var pos = _ghostPreview.GlobalPosition;
-			var rot = _ghostPreview.Rotation;
 			_ghostPreview.QueueFree();
 			_ghostPreview = null;
-			// Ghost will be recreated in next frame's UpdateGhostPosition
 		}
+	}
+
+	private void RecreateGhost()
+	{
+		ClearGhost();
+		// Ghost will be recreated in next frame's UpdateGhostPosition
 	}
 
 	private void PlaceStructure()
