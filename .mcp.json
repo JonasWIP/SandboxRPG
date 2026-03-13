@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "game-dev": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["tools/game-mcp/server.js"]
+    }
+  }
+}
