@@ -7,7 +7,11 @@ import { readFileSync, writeFileSync, unlinkSync, existsSync, createWriteStream 
 import { tmpdir } from "os";
 import { join } from "path";
 
+// Screenshot output width — coordinates you pass to click() must be in this space
+const SS_TARGET_WIDTH = 1280;
+
 // ── Paths ─────────────────────────────────────────────────────────────────────
+
 const HOME        = process.env.USERPROFILE;
 const APPDATA     = process.env.APPDATA;
 const LOCALAPPDATA = process.env.LOCALAPPDATA;
@@ -35,36 +39,41 @@ function ps(script) {
 }
 
 // ── Shared PS snippets ────────────────────────────────────────────────────────
-const PS_WIN32 = `
+
+// Win32 types for window capture + input without focus
+const PS_WINCAP = `
 Add-Type @'
-using System; using System.Runtime.InteropServices;
-public class WinAPI {
+using System; using System.Runtime.InteropServices; using System.Drawing;
+public class WinCap {
+  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+  [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr h, out RECT r);
+  [DllImport("user32.dll")] public static extern bool ClientToScreen(IntPtr h, ref POINT p);
+  [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr dc, uint f);
+  [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
   [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
   [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);
+  [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L,T,R,B; }
+  [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X,Y; }
 }
-'@`;
+'@
+Add-Type -AssemblyName System.Drawing`;
 
-function psGodotFocus() {
-  return `${PS_WIN32}
-$p = Get-Process | Where-Object { $_.ProcessName -like "*Godot*" } | Select-Object -First 1
-if ($p -and $p.MainWindowHandle -ne [IntPtr]::Zero) {
-  [WinAPI]::ShowWindow($p.MainWindowHandle, 9)
-  [WinAPI]::SetForegroundWindow($p.MainWindowHandle)
-  Start-Sleep -Milliseconds 400
-}`;
+// Track the PID of the Godot process we launched
+let _godotPid = null;
+
+// Returns PS snippet that sets $hw to the Godot window handle (or empty-handle if not found)
+function psGetWindow() {
+  return _godotPid
+    ? `$_proc = Get-Process -Id ${_godotPid} -ErrorAction SilentlyContinue`
+    : `$_proc = Get-Process | Where-Object { $_.MainWindowTitle -like '*SandboxRPG*' } | Select-Object -First 1`;
 }
 
 // ── Tools ─────────────────────────────────────────────────────────────────────
 const TOOLS = [
   {
     name: "screenshot",
-    description: "Capture a screenshot of the screen. Pass focus_godot=true to focus the Godot window first.",
-    inputSchema: {
-      type: "object",
-      properties: {
-        focus_godot: { type: "boolean", description: "Focus the Godot window before capturing" },
-      },
-    },
+    description: "Capture a screenshot of the Godot game window only (no focus needed — works in background).",
+    inputSchema: { type: "object", properties: {} },
   },
   {
     name: "server_status",
@@ -119,11 +128,11 @@ const TOOLS = [
   },
   {
     name: "send_key",
-    description: "Send keyboard input to the Godot window. Focuses it first.",
+    description: "Send keyboard input to the Godot window without focusing it. Supports single keys ('w', 'esc', 'space', 'enter', 'tab', '1'-'9'), modifier combos ('^c' Ctrl+C, '+i' Shift+I, '%f4' Alt+F4), and arrow/function keys ('left','right','up','down','f1'-'f12','back','delete').",
     inputSchema: {
       type: "object",
       properties: {
-        keys: { type: "string", description: "SendKeys string e.g. 'w', '{ESC}', '^c' (Ctrl+C), '+i' (Shift+I)" },
+        keys: { type: "string", description: "Key string e.g. 'w', 'esc', '^c' (Ctrl+C), '+i' (Shift+I), '%f4' (Alt+F4), 'f1', 'left'" },
         delay_ms: { type: "number", description: "Wait before sending (ms, default 0)" },
       },
       required: ["keys"],
@@ -131,12 +140,12 @@ const TOOLS = [
   },
   {
     name: "click",
-    description: "Move the mouse to screen coordinates and click. Focuses Godot first.",
+    description: "Send a mouse click to the Godot window without focusing it. Coordinates are in the game's client area scaled to 1280px wide (same space as screenshot).",
     inputSchema: {
       type: "object",
       properties: {
-        x: { type: "number", description: "Screen X coordinate" },
-        y: { type: "number", description: "Screen Y coordinate" },
+        x: { type: "number", description: "X coordinate in screenshot space (0-1280)" },
+        y: { type: "number", description: "Y coordinate in screenshot space" },
         button: { type: "string", enum: ["left", "right", "middle"], description: "Mouse button (default left)" },
       },
       required: ["x", "y"],
@@ -145,28 +154,69 @@ const TOOLS = [
 ];
 
 // ── Tool handlers ─────────────────────────────────────────────────────────────
-function handleScreenshot({ focus_godot }) {
-  const script = `
-${focus_godot ? psGodotFocus() : ""}
-Add-Type -AssemblyName System.Windows.Forms, System.Drawing
-$s = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
-$bmp = [System.Drawing.Bitmap]::new($s.Width, $s.Height)
-$g   = [System.Drawing.Graphics]::FromImage($bmp)
-$g.CopyFromScreen($s.Location, [System.Drawing.Point]::Empty, $s.Size)
-$path = "$env:TEMP\\claude_ss.png"
-$bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
-$g.Dispose(); $bmp.Dispose()
-Write-Output $path`;
+function handleScreenshot(_args) {
+  const imgPath = `${process.env.TEMP}\\claude_ss.png`;
+  const tw = SS_TARGET_WIDTH;
+  const imgPathPs = imgPath.replace(/\\/g, "\\\\");
 
-  const path = ps(script);
-  const data = readFileSync(path.trim()).toString("base64");
+  ps(`
+${PS_WINCAP}
+${psGetWindow()}
+if ($_proc -and $_proc.MainWindowHandle -ne [IntPtr]::Zero) {
+  $hw = $_proc.MainWindowHandle
+  # Capture full window via PrintWindow (works even when behind other windows)
+  $wr = New-Object WinCap+RECT
+  [WinCap]::GetWindowRect($hw, [ref]$wr) | Out-Null
+  $winW = $wr.R - $wr.L; $winH = $wr.B - $wr.T
+  $wbmp = New-Object System.Drawing.Bitmap $winW, $winH
+  $wg   = [System.Drawing.Graphics]::FromImage($wbmp)
+  $hdc  = $wg.GetHdc()
+  [WinCap]::PrintWindow($hw, $hdc, 2) | Out-Null   # 2 = PW_RENDERFULLCONTENT
+  $wg.ReleaseHdc($hdc); $wg.Dispose()
+  # Crop to client area only (strips title bar / window chrome)
+  $cr  = New-Object WinCap+RECT
+  [WinCap]::GetClientRect($hw, [ref]$cr) | Out-Null
+  $pt  = New-Object WinCap+POINT; $pt.X = 0; $pt.Y = 0
+  [WinCap]::ClientToScreen($hw, [ref]$pt) | Out-Null
+  $ox  = $pt.X - $wr.L; $oy = $pt.Y - $wr.T
+  $cw  = $cr.R - $cr.L; $ch  = $cr.B - $cr.T
+  $src = New-Object System.Drawing.Rectangle $ox, $oy, $cw, $ch
+  $cbmp = $wbmp.Clone($src, $wbmp.PixelFormat); $wbmp.Dispose()
+  # Scale to SS_TARGET_WIDTH
+  $th  = [int]($ch * ${tw} / $cw)
+  $out = New-Object System.Drawing.Bitmap ${tw}, $th
+  $sg  = [System.Drawing.Graphics]::FromImage($out)
+  $sg.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+  $sg.DrawImage($cbmp, 0, 0, ${tw}, $th)
+  $sg.Dispose(); $cbmp.Dispose()
+  $out.Save('${imgPathPs}', [System.Drawing.Imaging.ImageFormat]::Png)
+  $out.Dispose()
+} else {
+  # Fallback: full-screen capture if window not found
+  Add-Type -AssemblyName System.Windows.Forms
+  $s   = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+  $bmp = New-Object System.Drawing.Bitmap $s.Width, $s.Height
+  $g   = [System.Drawing.Graphics]::FromImage($bmp)
+  $null = $g.CopyFromScreen($s.Location, [System.Drawing.Point]::Empty, $s.Size)
+  $g.Dispose()
+  $th  = [int]($s.Height * ${tw} / $s.Width)
+  $out = New-Object System.Drawing.Bitmap ${tw}, $th
+  $sg  = [System.Drawing.Graphics]::FromImage($out)
+  $sg.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+  $sg.DrawImage($bmp, 0, 0, ${tw}, $th)
+  $sg.Dispose(); $bmp.Dispose()
+  $out.Save('${imgPathPs}', [System.Drawing.Imaging.ImageFormat]::Png)
+  $out.Dispose()
+}`);
+
+  const data = readFileSync(imgPath).toString("base64");
   return [{ type: "image", data, mimeType: "image/png" }];
 }
 
 function handleServerStatus() {
   const out = ps(`
 $stdb  = Get-Process spacetimedb-standalone -ErrorAction SilentlyContinue
-$godot = Get-Process | Where-Object { $_.ProcessName -like "*Godot*" } -ErrorAction SilentlyContinue
+$godot = Get-Process | Where-Object { $_.MainWindowTitle -like '*SandboxRPG*' } | Select-Object -First 1
 "SpacetimeDB : $(if($stdb)  {"RUNNING  pid=$($stdb.Id)"}  else {"STOPPED"})"
 "Godot       : $(if($godot) {"RUNNING  pid=$($godot.Id)"} else {"STOPPED"})"
 try {
@@ -239,6 +289,7 @@ function handleStartGodot({ scene, editor }) {
   const proc = spawn(GODOT, args, { detached: true, stdio: ["ignore", "pipe", "pipe"] });
   proc.stdout.pipe(log);
   proc.stderr.pipe(log);
+  _godotPid = proc.pid;
   proc.unref();
 
   return [{ type: "text", text: `Godot started (pid ${proc.pid}). Log: ${GODOT_LOG}` }];
@@ -246,11 +297,12 @@ function handleStartGodot({ scene, editor }) {
 
 function handleStopGodot() {
   const out = ps(`
-$procs = Get-Process | Where-Object { $_.ProcessName -like "*Godot*" }
+$procs = Get-Process | Where-Object { $_.MainWindowTitle -like '*SandboxRPG*' }
 if ($procs) {
   $procs | ForEach-Object { Stop-Process -Id $_.Id -Force; "Stopped Godot pid $($_.Id)" }
 } else { "Godot was not running" }
 `);
+  _godotPid = null;
   return [{ type: "text", text: out }];
 }
 
@@ -261,38 +313,111 @@ function handleReadLogs({ lines = 80 }) {
   return [{ type: "text", text: tail || "(log is empty)" }];
 }
 
+// VK code map for common keys used in game testing
+const VK = {
+  'esc':0x1B,'{esc}':0x1B,'escape':0x1B,
+  'enter':0x0D,'{enter}':0x0D,
+  'tab':0x09,'{tab}':0x09,
+  'space':0x20,'{space}':0x20,
+  'back':0x08,'{back}':0x08,'backspace':0x08,
+  'delete':0x2E,'{delete}':0x2E,'{del}':0x2E,
+  'left':0x25,'{left}':0x25,
+  'right':0x27,'{right}':0x27,
+  'up':0x26,'{up}':0x26,
+  'down':0x28,'{down}':0x28,
+  'f1':0x70,'f2':0x71,'f3':0x72,'f4':0x73,'f5':0x74,'f6':0x75,
+  'f7':0x76,'f8':0x77,'f9':0x78,'f10':0x79,'f11':0x7A,'f12':0x7B,
+  'a':0x41,'b':0x42,'c':0x43,'d':0x44,'e':0x45,'f':0x46,'g':0x47,'h':0x48,
+  'i':0x49,'j':0x4A,'k':0x4B,'l':0x4C,'m':0x4D,'n':0x4E,'o':0x4F,'p':0x50,
+  'q':0x51,'r':0x52,'s':0x53,'t':0x54,'u':0x55,'v':0x56,'w':0x57,'x':0x58,'y':0x59,'z':0x5A,
+  '0':0x30,'1':0x31,'2':0x32,'3':0x33,'4':0x34,'5':0x35,'6':0x36,'7':0x37,'8':0x38,'9':0x39,
+};
+
+// Send one VK code via PostMessage (no focus needed)
+function psPostKey(vk, delay_ms) {
+  return `
+${PS_WINCAP}
+${psGetWindow()}
+if ($_proc -and $_proc.MainWindowHandle -ne [IntPtr]::Zero) {
+  $hw = $_proc.MainWindowHandle
+  if (${delay_ms} -gt 0) { Start-Sleep -Milliseconds ${delay_ms} }
+  [WinCap]::PostMessage($hw, 0x0100, [IntPtr]${vk}, [IntPtr]0x00010001) | Out-Null
+  Start-Sleep -Milliseconds 40
+  [WinCap]::PostMessage($hw, 0x0101, [IntPtr]${vk}, [IntPtr]0xC0010001) | Out-Null
+}`;
+}
+
+// Send modifier + key via PostMessage (no focus needed)
+// modVk: 0x11 Ctrl, 0x10 Shift, 0x12 Alt
+function psPostModKey(modVk, keyVk, delay_ms) {
+  return `
+${PS_WINCAP}
+${psGetWindow()}
+if ($_proc -and $_proc.MainWindowHandle -ne [IntPtr]::Zero) {
+  $hw = $_proc.MainWindowHandle
+  if (${delay_ms} -gt 0) { Start-Sleep -Milliseconds ${delay_ms} }
+  [WinCap]::PostMessage($hw, 0x0100, [IntPtr]${modVk}, [IntPtr]0x00010001) | Out-Null
+  Start-Sleep -Milliseconds 20
+  [WinCap]::PostMessage($hw, 0x0100, [IntPtr]${keyVk}, [IntPtr]0x00010001) | Out-Null
+  Start-Sleep -Milliseconds 40
+  [WinCap]::PostMessage($hw, 0x0101, [IntPtr]${keyVk}, [IntPtr]0xC0010001) | Out-Null
+  Start-Sleep -Milliseconds 20
+  [WinCap]::PostMessage($hw, 0x0101, [IntPtr]${modVk}, [IntPtr]0xC0010001) | Out-Null
+}`;
+}
+
 function handleSendKey({ keys, delay_ms = 0 }) {
-  const escaped = keys.replace(/'/g, "''");
-  ps(`
-${psGodotFocus()}
-Add-Type -AssemblyName System.Windows.Forms
-if (${delay_ms} -gt 0) { Start-Sleep -Milliseconds ${delay_ms} }
-[System.Windows.Forms.SendKeys]::SendWait('${escaped}')
-`);
-  return [{ type: "text", text: `Sent keys: ${keys}` }];
+  const k = keys.toLowerCase().trim();
+
+  // Direct key match
+  const vk = VK[k];
+  if (vk) {
+    ps(psPostKey(vk, delay_ms));
+    return [{ type: "text", text: `Sent key: ${keys}` }];
+  }
+
+  // Modifier prefix: ^=Ctrl, +=Shift, %=Alt (SendKeys notation)
+  const modMap = { '^': [0x11, 'Ctrl'], '+': [0x10, 'Shift'], '%': [0x12, 'Alt'] };
+  const modEntry = modMap[k[0]];
+  if (modEntry) {
+    const bare = k.slice(1).replace(/[{}]/g, ''); // strip { } from e.g. ^{f4}
+    const baseVk = VK[bare] ?? VK[`{${bare}}`];
+    if (baseVk) {
+      ps(psPostModKey(modEntry[0], baseVk, delay_ms));
+      return [{ type: "text", text: `Sent ${modEntry[1]}+${bare.toUpperCase()}` }];
+    }
+  }
+
+  return [{ type: "text", text: `Unknown key: '${keys}' — not in VK map. Use a key from: esc, enter, space, tab, a-z, 0-9, f1-f12, left/right/up/down, back, delete, ^key, +key, %key` }];
 }
 
 function handleClick({ x, y, button = "left" }) {
-  const btn = button === "right" ? "RightButton" : button === "middle" ? "MiddleButton" : "LeftButton";
+  // x,y are in SS_TARGET_WIDTH coordinate space mapped to the game client area.
+  // Scale factor: clientWidth / SS_TARGET_WIDTH (same as screenshot, aspect-ratio-preserving)
+  // WM messages: left=0x201/0x202, right=0x204/0x205, middle=0x207/0x208
+  const [downMsg, upMsg, btnFlag] =
+    button === "right"  ? [0x204, 0x205, 0x0002] :
+    button === "middle" ? [0x207, 0x208, 0x0010] :
+                          [0x201, 0x202, 0x0001];
+
   ps(`
-${psGodotFocus()}
-Add-Type -AssemblyName System.Windows.Forms
-[System.Windows.Forms.Cursor]::Position = [System.Drawing.Point]::new(${x}, ${y})
-Start-Sleep -Milliseconds 100
-$t = [System.Windows.Forms.MouseEventArgs]
-Add-Type @'
-using System; using System.Runtime.InteropServices;
-public class Mouse {
-  [DllImport("user32.dll")] public static extern void mouse_event(int f, int x, int y, int d, int e);
-}
-'@
-$down = $(if("${btn}" -eq "RightButton"){8}elseif("${btn}" -eq "MiddleButton"){32}else{2})
-$up   = $(if("${btn}" -eq "RightButton"){16}elseif("${btn}" -eq "MiddleButton"){64}else{4})
-[Mouse]::mouse_event($down, 0, 0, 0, 0)
-Start-Sleep -Milliseconds 50
-[Mouse]::mouse_event($up, 0, 0, 0, 0)
-`);
-  return [{ type: "text", text: `Clicked ${button} at (${x}, ${y})` }];
+${PS_WINCAP}
+${psGetWindow()}
+if ($_proc -and $_proc.MainWindowHandle -ne [IntPtr]::Zero) {
+  $hw = $_proc.MainWindowHandle
+  $cr = New-Object WinCap+RECT
+  [WinCap]::GetClientRect($hw, [ref]$cr) | Out-Null
+  $cw = $cr.R - $cr.L; $ch = $cr.B - $cr.T
+  # Same scale factor used by screenshot (SS_TARGET_WIDTH / clientWidth)
+  $scale = $cw / ${SS_TARGET_WIDTH}
+  $cx = [int](${x} * $scale)
+  $cy = [int](${y} * $scale)
+  $lp = [IntPtr](($cy -shl 16) -bor ($cx -band 0xFFFF))
+  [WinCap]::PostMessage($hw, 0x${downMsg.toString(16)}, [IntPtr]${btnFlag}, $lp) | Out-Null
+  Start-Sleep -Milliseconds 60
+  [WinCap]::PostMessage($hw, 0x${upMsg.toString(16)}, [IntPtr]0, $lp) | Out-Null
+}`);
+  return [{ type: "text", text: `Clicked ${button} at (${x},${y}) in window-client space` }];
 }
 
 // ── MCP Server ────────────────────────────────────────────────────────────────

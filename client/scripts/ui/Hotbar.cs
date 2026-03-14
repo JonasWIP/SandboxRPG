@@ -19,6 +19,8 @@ public partial class Hotbar : Control
     private readonly ColorRect[]      _colourDots  = new ColorRect[SlotCount];
 
     /// <summary>Item type currently in the active hotbar slot, or null if empty.</summary>
+    public static Hotbar? Instance { get; private set; }
+
     public string? ActiveItemType { get; private set; }
 
     // =========================================================================
@@ -27,7 +29,14 @@ public partial class Hotbar : Control
 
     public override void _Ready()
     {
-        SetAnchorsPreset(LayoutPreset.BottomWide);
+        Instance = this;
+
+        // Explicitly size to the viewport bottom — anchor-based sizing is unreliable
+        // when the parent Control's layout hasn't been finalised at _Ready() time.
+        var vp = GetViewport().GetVisibleRect();
+        float totalH = UIFactory.SlotSize.Y + 30; // slot + number label above + padding
+        Size = new Vector2(vp.Size.X, totalH);
+        Position = new Vector2(0, vp.Size.Y - totalH);
         MouseFilter = MouseFilterEnum.Ignore;
         BuildUI();
 
@@ -37,6 +46,7 @@ public partial class Hotbar : Control
 
     public override void _ExitTree()
     {
+        if (Instance == this) Instance = null;
         if (GameManager.Instance is not null)
         {
             GameManager.Instance.InventoryChanged -= Refresh;
@@ -79,13 +89,10 @@ public partial class Hotbar : Control
 
     private void BuildUI()
     {
-        // Centred container at screen bottom
+        // Full-width row — parent Hotbar is explicitly sized, so FullRect works here
         var center = new HBoxContainer();
         center.AddThemeConstantOverride("separation", 4);
-        center.SetAnchorsPreset(LayoutPreset.BottomWide);
-        center.GrowHorizontal = GrowDirection.Both;
-        center.OffsetBottom = -12;
-        center.OffsetTop = -(UIFactory.SlotSize.Y + 12);
+        center.SetAnchorsPreset(LayoutPreset.FullRect);
         AddChild(center);
 
         // Spacer to push slots to centre

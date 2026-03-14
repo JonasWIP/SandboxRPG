@@ -1,13 +1,11 @@
 ---
 name: screenshot
-description: Take a screenshot of the screen and display it. Optionally focus the Godot window first.
+description: Take a screenshot of the Godot game window and display it.
 user-invocable: true
 allowed-tools: mcp__game-dev__screenshot
 ---
 
-Take a screenshot using the game-dev MCP tool.
-
-If the user passed "godot" as an argument ($ARGUMENTS contains "godot"), set focus_godot=true.
-Otherwise capture whatever is currently on screen.
+Take a screenshot of the Godot game window using the game-dev MCP tool.
+The screenshot captures only the game client area without stealing focus from other programs.
 
 After taking the screenshot, describe what you see and note any visible issues (UI layout, errors, visual glitches).

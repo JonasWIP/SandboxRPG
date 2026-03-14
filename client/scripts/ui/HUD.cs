@@ -66,17 +66,30 @@ public partial class HUD : Control
         _statusLabel.AddThemeFontSizeOverride("font_size", 14);
         AddChild(_statusLabel);
 
-        // Health / stamina bars (bottom left, above hotbar)
-        var barsContainer = new VBoxContainer
+        // Health / stamina bars (bottom left, above hotbar) — wrapped in a dark panel
+        var barsPanel = new PanelContainer
         {
             LayoutMode    = 1,
             AnchorsPreset = (int)LayoutPreset.BottomLeft,
-            OffsetLeft    = 20,
-            OffsetBottom  = -90,   // sit above the hotbar
-            OffsetTop     = -170,
-            OffsetRight   = 220,
+            OffsetLeft    = 10,
+            OffsetBottom  = -90,
+            OffsetTop     = -175,
+            OffsetRight   = 230,
         };
-        AddChild(barsContainer);
+        var barsPanelStyle = new StyleBoxFlat
+        {
+            BgColor               = new Color(0f, 0f, 0f, 0.45f),
+            CornerRadiusTopLeft   = 4, CornerRadiusTopRight  = 4,
+            CornerRadiusBottomLeft= 4, CornerRadiusBottomRight = 4,
+            ContentMarginLeft = 8, ContentMarginRight  = 8,
+            ContentMarginTop  = 6, ContentMarginBottom = 6,
+        };
+        barsPanel.AddThemeStyleboxOverride("panel", barsPanelStyle);
+        AddChild(barsPanel);
+
+        var barsContainer = new VBoxContainer();
+        barsContainer.AddThemeConstantOverride("separation", 2);
+        barsPanel.AddChild(barsContainer);
 
         var healthLabel = new Label { Text = "HP" };
         healthLabel.AddThemeColorOverride("font_color", new Color(1, 0.3f, 0.3f));

@@ -24,8 +24,12 @@ public abstract partial class BasePanel : Control
 
     public override void _Ready()
     {
-        // Full-screen so the MouseFilter.Stop backdrop blocks gameplay clicks
-        SetAnchorsPreset(LayoutPreset.FullRect);
+        // Panels live inside UIManager's CanvasLayer (not a Control parent),
+        // so anchor presets have no parent rect to compute against.
+        // Explicitly size to the current viewport instead.
+        var vpRect = GetViewport().GetVisibleRect();
+        Position = vpRect.Position;
+        Size = vpRect.Size;
         MouseFilter = MouseFilterEnum.Stop;
         BuildUI();
     }

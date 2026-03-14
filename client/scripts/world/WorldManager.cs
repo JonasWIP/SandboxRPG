@@ -26,6 +26,11 @@ public partial class WorldManager : Node3D
 		gm.PlayerRemoved += OnPlayerRemoved;
 		gm.WorldItemChanged += OnWorldItemsChanged;
 		gm.StructureChanged += OnStructuresChanged;
+
+		// If the subscription was applied before this scene loaded (the normal
+		// flow after MainMenu → CharacterSetup → Game), spawn the world now.
+		if (GameManager.Instance.IsConnected && GameManager.Instance.GetLocalPlayer() != null)
+			OnSubscriptionApplied();
 	}
 
 	private void OnSubscriptionApplied()
@@ -35,13 +40,11 @@ public partial class WorldManager : Node3D
 		// Spawn local player
 		SpawnLocalPlayer();
 
-		// Spawn all existing remote players
+		// Spawn all currently online remote players
 		foreach (var player in GameManager.Instance.GetAllPlayers())
 		{
-			if (player.Identity != GameManager.Instance.LocalIdentity)
-			{
+			if (player.Identity != GameManager.Instance.LocalIdentity && player.IsOnline)
 				SpawnOrUpdateRemotePlayer(player);
-			}
 		}
 
 		// Spawn world items
@@ -212,7 +215,7 @@ public partial class WorldManager : Node3D
 		};
 		node.AddChild(label);
 
-		node.GlobalPosition = new Vector3(item.PosX, item.PosY, item.PosZ);
+		node.Position = new Vector3(item.PosX, item.PosY, item.PosZ);
 
 		// Store item ID as metadata for interaction
 		node.SetMeta("world_item_id", (long)item.Id);
@@ -303,7 +306,7 @@ public partial class WorldManager : Node3D
 		mesh.Position = new Vector3(0, yOffset, 0);
 		node.AddChild(mesh);
 
-		node.GlobalPosition = new Vector3(structure.PosX, structure.PosY, structure.PosZ);
+		node.Position = new Vector3(structure.PosX, structure.PosY, structure.PosZ);
 		node.Rotation = new Vector3(0, structure.RotY, 0);
 
 		// Store structure ID
