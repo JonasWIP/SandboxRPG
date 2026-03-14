@@ -76,15 +76,7 @@ public partial class HUD : Control
             OffsetTop     = -175,
             OffsetRight   = 230,
         };
-        var barsPanelStyle = new StyleBoxFlat
-        {
-            BgColor               = new Color(0f, 0f, 0f, 0.45f),
-            CornerRadiusTopLeft   = 4, CornerRadiusTopRight  = 4,
-            CornerRadiusBottomLeft= 4, CornerRadiusBottomRight = 4,
-            ContentMarginLeft = 8, ContentMarginRight  = 8,
-            ContentMarginTop  = 6, ContentMarginBottom = 6,
-        };
-        barsPanel.AddThemeStyleboxOverride("panel", barsPanelStyle);
+        barsPanel.AddThemeStyleboxOverride("panel", UIFactory.MakeDarkPanelStyle(0.45f));
         AddChild(barsPanel);
 
         var barsContainer = new VBoxContainer();

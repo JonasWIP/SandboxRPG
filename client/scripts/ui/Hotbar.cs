@@ -192,13 +192,10 @@ public partial class Hotbar : Control
         UpdateSlotStyle(prev, false);
         UpdateSlotStyle(index, true);
 
-        // Update active item
-        var slotMap = new Dictionary<int, string>();
+        // Update active item — scan directly, no intermediate dictionary needed
+        ActiveItemType = null;
         foreach (var item in GameManager.Instance.GetMyInventory())
-            if (item.Slot >= 0 && item.Slot < SlotCount)
-                slotMap[item.Slot] = item.ItemType;
-
-        ActiveItemType = slotMap.TryGetValue(_activeSlot, out var t) ? t : null;
+            if (item.Slot == _activeSlot) { ActiveItemType = item.ItemType; break; }
     }
 
     private void UpdateSlotStyle(int index, bool active)

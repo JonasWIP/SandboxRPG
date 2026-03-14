@@ -59,6 +59,19 @@ public static class UIFactory
         return edit;
     }
 
+    /// <summary>Dark semi-transparent StyleBoxFlat for HUD overlay panels (chat, bars, etc.).</summary>
+    public static StyleBoxFlat MakeDarkPanelStyle(float alpha = 0.4f, int cornerRadius = 4, int margin = 8)
+    {
+        return new StyleBoxFlat
+        {
+            BgColor = new Color(0f, 0f, 0f, alpha),
+            CornerRadiusTopLeft    = cornerRadius, CornerRadiusTopRight    = cornerRadius,
+            CornerRadiusBottomLeft = cornerRadius, CornerRadiusBottomRight = cornerRadius,
+            ContentMarginLeft = margin, ContentMarginRight  = margin,
+            ContentMarginTop  = margin, ContentMarginBottom = margin,
+        };
+    }
+
     /// <summary>Full-rect dark semi-transparent background — used as panel backdrop.</summary>
     public static ColorRect MakeDarkBackground(Color? colour = null)
     {

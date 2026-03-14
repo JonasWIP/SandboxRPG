@@ -16,6 +16,7 @@ public partial class WorldManager : Node3D
 	private readonly Dictionary<ulong, Node3D> _structures = new();
 
 	private PlayerController? _localPlayer;
+	private bool _worldSpawned;
 
 	public override void _Ready()
 	{
@@ -35,6 +36,8 @@ public partial class WorldManager : Node3D
 
 	private void OnSubscriptionApplied()
 	{
+		if (_worldSpawned) return;
+		_worldSpawned = true;
 		GD.Print("[WorldManager] Initial data received, spawning world...");
 
 		// Spawn local player

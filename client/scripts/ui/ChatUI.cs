@@ -31,15 +31,7 @@ public partial class ChatUI : Control
 			OffsetRight   = 450,
 		};
 
-		var style = new StyleBoxFlat
-		{
-			BgColor                 = new Color(0, 0, 0, 0.4f),
-			CornerRadiusBottomLeft  = 4, CornerRadiusBottomRight = 4,
-			CornerRadiusTopLeft     = 4, CornerRadiusTopRight    = 4,
-			ContentMarginLeft       = 8, ContentMarginRight      = 8,
-			ContentMarginTop        = 8, ContentMarginBottom     = 8,
-		};
-		_chatPanel.AddThemeStyleboxOverride("panel", style);
+		_chatPanel.AddThemeStyleboxOverride("panel", UIFactory.MakeDarkPanelStyle(0.4f));
 		AddChild(_chatPanel);
 
 		var vbox = new VBoxContainer();
@@ -140,10 +132,16 @@ public partial class ChatUI : Control
     {
         _messages.Add(bbcodeText);
         if (_messages.Count > MaxMessages)
+        {
             _messages.RemoveAt(0);
-
-        _chatLog.Clear();
-        foreach (var msg in _messages)
-            _chatLog.AppendText(msg + "\n");
+            // Rebuild only when an old message is evicted (at most once per 50 msgs)
+            _chatLog.Clear();
+            foreach (var msg in _messages)
+                _chatLog.AppendText(msg + "\n");
+        }
+        else
+        {
+            _chatLog.AppendText(bbcodeText + "\n");
+        }
     }
 }
