@@ -33,6 +33,7 @@ namespace SpacetimeDB.Types
             AddTable(PlacedStructure = new(conn));
             AddTable(Player = new(conn));
             AddTable(WorldItem = new(conn));
+            AddTable(WorldObject = new(conn));
         }
     }
 
@@ -535,6 +536,7 @@ namespace SpacetimeDB.Types
             new QueryBuilder().From.PlacedStructure().ToSql(),
             new QueryBuilder().From.Player().ToSql(),
             new QueryBuilder().From.WorldItem().ToSql(),
+            new QueryBuilder().From.WorldObject().ToSql(),
         }
         ;
     }
@@ -547,6 +549,7 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Table<PlacedStructure, PlacedStructureCols, PlacedStructureIxCols> PlacedStructure() => new("placed_structure", new PlacedStructureCols("placed_structure"), new PlacedStructureIxCols("placed_structure"));
         public global::SpacetimeDB.Table<Player, PlayerCols, PlayerIxCols> Player() => new("player", new PlayerCols("player"), new PlayerIxCols("player"));
         public global::SpacetimeDB.Table<WorldItem, WorldItemCols, WorldItemIxCols> WorldItem() => new("world_item", new WorldItemCols("world_item"), new WorldItemIxCols("world_item"));
+        public global::SpacetimeDB.Table<WorldObject, WorldObjectCols, WorldObjectIxCols> WorldObject() => new("world_object", new WorldObjectCols("world_object"), new WorldObjectIxCols("world_object"));
     }
 
     public sealed class TypedSubscriptionBuilder
@@ -629,6 +632,7 @@ namespace SpacetimeDB.Types
             return reducer switch
             {
                 Reducer.CraftItem args => Reducers.InvokeCraftItem(eventContext, args),
+                Reducer.DamageWorldObject args => Reducers.InvokeDamageWorldObject(eventContext, args),
                 Reducer.DropItem args => Reducers.InvokeDropItem(eventContext, args),
                 Reducer.MoveItemToSlot args => Reducers.InvokeMoveItemToSlot(eventContext, args),
                 Reducer.MovePlayer args => Reducers.InvokeMovePlayer(eventContext, args),
