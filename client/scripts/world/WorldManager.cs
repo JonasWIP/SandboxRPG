@@ -265,20 +265,35 @@ public partial class WorldManager : Node3D
 		_                              => null,
 	};
 
-	/// <summary>Recursively applies a color tint to all MeshInstance3D nodes in the subtree.</summary>
-	private static void TintMeshes(Node root, Color color, StandardMaterial3D? mat = null)
+	/// <summary>Recursively tints MeshInstance3D nodes, duplicating existing materials so textures are preserved.</summary>
+	private static void TintMeshes(Node root, Color color)
 	{
-		mat ??= new StandardMaterial3D { AlbedoColor = color, Roughness = 0.85f };
-		if (root is MeshInstance3D mi) mi.MaterialOverride = mat;
+		if (root is MeshInstance3D mi && mi.Mesh != null)
+		{
+			for (int surf = 0; surf < mi.Mesh.GetSurfaceCount(); surf++)
+			{
+				var existing = mi.GetActiveMaterial(surf);
+				if (existing is BaseMaterial3D baseMat)
+				{
+					var dup = (BaseMaterial3D)baseMat.Duplicate();
+					dup.AlbedoColor = color;
+					mi.SetSurfaceOverrideMaterial(surf, dup);
+				}
+				else
+				{
+					mi.SetSurfaceOverrideMaterial(surf, new StandardMaterial3D { AlbedoColor = color, Roughness = 0.85f });
+				}
+			}
+		}
 		foreach (Node child in root.GetChildren())
-			TintMeshes(child, color, mat);
+			TintMeshes(child, color);
 	}
 
 	private static (Vector3 size, Vector3 center) GetStructureBoxShape(string t) => t switch
 	{
-		"wood_wall"   or "stone_wall"  => (new Vector3(2.5f, 2.5f, 0.25f), new Vector3(0, 1.25f, 0)),
+		"wood_wall"   or "stone_wall"  => (new Vector3(2.5f, 2.0f, 0.25f), new Vector3(0, 1.0f, 0)),
 		"wood_floor"  or "stone_floor" => (new Vector3(2.5f, 0.1f,  2.5f),  new Vector3(0, 0.05f, 0)),
-		"wood_door"                    => (new Vector3(2.5f, 2.5f, 0.25f), new Vector3(0, 1.25f, 0)),
+		"wood_door"                    => (new Vector3(2.5f, 2.0f, 0.25f), new Vector3(0, 1.0f, 0)),
 		"campfire"                     => (new Vector3(0.8f, 0.4f,  0.8f),  new Vector3(0, 0.2f,  0)),
 		"workbench"                    => (new Vector3(1.2f, 0.8f,  0.6f),  new Vector3(0, 0.4f,  0)),
 		"chest"                        => (new Vector3(0.8f, 0.6f,  0.6f),  new Vector3(0, 0.3f,  0)),
@@ -325,6 +340,13 @@ public partial class WorldManager : Node3D
 		{
 			var scene  = ResourceLoader.Load<PackedScene>(modelPath);
 			var visual = scene.Instantiate<Node3D>();
+			Color? tint = structure.StructureType switch
+			{
+				"wood_wall" or "wood_floor" or "wood_door" => new Color(0.65f, 0.45f, 0.25f),
+				"stone_wall" or "stone_floor"              => new Color(0.6f,  0.6f,  0.65f),
+				_                                           => (Color?)null,
+			};
+			if (tint.HasValue) TintMeshes(visual, tint.Value);
 			body.AddChild(visual);
 			var convex = BuildConvexShape(visual, 1.0f);
 			if (convex.Points.Length > 0)
