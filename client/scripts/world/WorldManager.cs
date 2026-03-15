@@ -390,6 +390,23 @@ public partial class WorldManager : Node3D
 		}
 	}
 
+	private static ConvexPolygonShape3D BuildConvexShape(Node3D model, float scale)
+	{
+		var verts = new List<Vector3>();
+		CollectFaces(model, verts);
+		for (int i = 0; i < verts.Count; i++)
+			verts[i] *= scale;
+		return new ConvexPolygonShape3D { Points = verts.ToArray() };
+	}
+
+	private static void CollectFaces(Node node, List<Vector3> verts)
+	{
+		if (node is MeshInstance3D mi && mi.Mesh != null)
+			verts.AddRange(mi.Mesh.GetFaces());
+		foreach (Node child in node.GetChildren())
+			CollectFaces(child, verts);
+	}
+
 	private Node3D CreateWorldObjectVisual(WorldObject obj)
 	{
 		var body = new StaticBody3D { Name = $"WorldObject_{obj.Id}" };
@@ -420,32 +437,30 @@ public partial class WorldManager : Node3D
 			var model = ResourceLoader.Load<PackedScene>(modelPath).Instantiate<Node3D>();
 			model.Scale = Vector3.One * modelScale;
 			body.AddChild(model);
+			body.AddChild(new CollisionShape3D { Shape = BuildConvexShape(model, modelScale) });
 		}
 		else
 		{
 			body.AddChild(new MeshInstance3D
 			{
-				Mesh = new BoxMesh { Size = new Vector3(0.8f, 1.5f, 0.8f) * modelScale },
+				Mesh     = new BoxMesh { Size = new Vector3(0.8f, 1.5f, 0.8f) * modelScale },
 				Position = new Vector3(0, 0.75f * modelScale, 0),
 			});
+			var shapeSize = obj.ObjectType switch
+			{
+				"tree_pine" or "tree_palm" => new Vector3(1.2f, 6.0f, 1.2f),
+				"tree_dead"                => new Vector3(1.0f, 5.0f, 1.0f),
+				"rock_large"               => new Vector3(2.4f, 1.6f, 2.4f),
+				"rock_small"               => new Vector3(1.1f, 0.7f, 1.1f),
+				"bush"                     => new Vector3(1.5f, 1.0f, 1.5f),
+				_                          => new Vector3(0.8f, 1.0f, 0.8f),
+			};
+			body.AddChild(new CollisionShape3D
+			{
+				Shape    = new BoxShape3D { Size = shapeSize },
+				Position = new Vector3(0, shapeSize.Y / 2f, 0),
+			});
 		}
-
-		// Approximate collision shape per type
-		var shapeSize = obj.ObjectType switch
-		{
-			"tree_pine" or "tree_palm" => new Vector3(1.2f, 6.0f, 1.2f),
-			"tree_dead"                => new Vector3(1.0f, 5.0f, 1.0f),
-			"rock_large"               => new Vector3(2.4f, 1.6f, 2.4f),
-			"rock_small"               => new Vector3(1.1f, 0.7f, 1.1f),
-			"bush"                     => new Vector3(1.5f, 1.0f, 1.5f),
-			_                          => new Vector3(0.8f, 1.0f, 0.8f),
-		};
-		var collider = new CollisionShape3D
-		{
-			Shape = new BoxShape3D { Size = shapeSize },
-			Position = new Vector3(0, shapeSize.Y / 2f, 0),
-		};
-		body.AddChild(collider);
 
 		// Snap Y to client terrain height — ignores any server/client formula drift
 		float groundY = Terrain.HeightAt(obj.PosX, obj.PosZ);
