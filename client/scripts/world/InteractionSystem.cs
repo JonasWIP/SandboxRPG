@@ -120,7 +120,7 @@ public partial class InteractionSystem : Node
         if (Input.IsActionJustPressed("interact"))
         {
             var id = (ulong)collider.GetMeta("world_object_id", 0L).AsInt64();
-            GameManager.Instance.DamageWorldObject(id, 25);
+            GameManager.Instance.HarvestWorldObject(id, "hand");
         }
     }
 }

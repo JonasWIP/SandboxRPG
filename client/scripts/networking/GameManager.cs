@@ -112,7 +112,7 @@ public partial class GameManager : Node
 	public void PlaceBuildStructure(string type, float x, float y, float z, float rotY) => Conn?.Reducers.PlaceStructure(type, x, y, z, rotY);
 	public void RemoveBuildStructure(ulong id) => Conn?.Reducers.RemoveStructure(id);
 	public void MoveItemSlot(ulong id, int slot) => Conn?.Reducers.MoveItemToSlot(id, slot);
-	public void DamageWorldObject(ulong id, uint damage) => Conn?.Reducers.DamageWorldObject(id, damage);
+	public void HarvestWorldObject(ulong id, string toolType) => Conn?.Reducers.HarvestWorldObject(id, toolType);
 
 	// =========================================================================
 	// DATA ACCESS — READ FROM STDB CLIENT CACHE

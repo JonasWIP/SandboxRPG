@@ -12,17 +12,17 @@ namespace SpacetimeDB.Types
 {
     public sealed partial class RemoteReducers : RemoteBase
     {
-        public delegate void DamageWorldObjectHandler(ReducerEventContext ctx, ulong id, uint damage);
-        public event DamageWorldObjectHandler? OnDamageWorldObject;
+        public delegate void HarvestWorldObjectHandler(ReducerEventContext ctx, ulong id, string toolType);
+        public event HarvestWorldObjectHandler? OnHarvestWorldObject;
 
-        public void DamageWorldObject(ulong id, uint damage)
+        public void HarvestWorldObject(ulong id, string toolType)
         {
-            conn.InternalCallReducer(new Reducer.DamageWorldObject(id, damage));
+            conn.InternalCallReducer(new Reducer.HarvestWorldObject(id, toolType));
         }
 
-        public bool InvokeDamageWorldObject(ReducerEventContext ctx, Reducer.DamageWorldObject args)
+        public bool InvokeHarvestWorldObject(ReducerEventContext ctx, Reducer.HarvestWorldObject args)
         {
-            if (OnDamageWorldObject == null)
+            if (OnHarvestWorldObject == null)
             {
                 if (InternalOnUnhandledReducerError != null)
                 {
@@ -34,10 +34,10 @@ namespace SpacetimeDB.Types
                 }
                 return false;
             }
-            OnDamageWorldObject(
+            OnHarvestWorldObject(
                 ctx,
                 args.Id,
-                args.Damage
+                args.ToolType
             );
             return true;
         }
@@ -47,27 +47,28 @@ namespace SpacetimeDB.Types
     {
         [SpacetimeDB.Type]
         [DataContract]
-        public sealed partial class DamageWorldObject : Reducer, IReducerArgs
+        public sealed partial class HarvestWorldObject : Reducer, IReducerArgs
         {
             [DataMember(Name = "id")]
             public ulong Id;
-            [DataMember(Name = "damage")]
-            public uint Damage;
+            [DataMember(Name = "tool_type")]
+            public string ToolType;
 
-            public DamageWorldObject(
+            public HarvestWorldObject(
                 ulong Id,
-                uint Damage
+                string ToolType
             )
             {
                 this.Id = Id;
-                this.Damage = Damage;
+                this.ToolType = ToolType;
             }
 
-            public DamageWorldObject()
+            public HarvestWorldObject()
             {
+                this.ToolType = "";
             }
 
-            string IReducerArgs.ReducerName => "damage_world_object";
+            string IReducerArgs.ReducerName => "harvest_world_object";
         }
     }
 }
