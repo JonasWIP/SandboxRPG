@@ -30,6 +30,10 @@ public static partial class Module
             ctx.Db.ModConfig.Insert(new ModConfig { ModId = "currency", Enabled = true, Version = "1.0.0", Dependencies = "" });
         if (ctx.Db.ModConfig.ModId.Find("casino") == null)
             ctx.Db.ModConfig.Insert(new ModConfig { ModId = "casino", Enabled = true, Version = "1.0.0", Dependencies = "currency" });
+
+#if MOD_CASINO
+        SeedCasino(ctx);
+#endif
     }
 
     [Reducer(ReducerKind.ClientConnected)]

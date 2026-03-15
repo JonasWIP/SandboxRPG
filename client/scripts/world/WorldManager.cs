@@ -363,7 +363,37 @@ public partial class WorldManager : Node3D
 		body.SetMeta("structure_type", structure.StructureType);
 		body.SetMeta("owner_id",       structure.OwnerId.ToString());
 
+		AttachStructureInteraction(body, structure.Id, structure.StructureType);
+
+#if MOD_CASINO
+		if (structure.StructureType == "casino_slot_machine")
+			SlotMachineUI.AttachToNode(body, structure.Id);
+		else if (structure.StructureType == "casino_blackjack_table")
+			BlackjackUI.AttachToNode(body, structure.Id);
+		else if (structure.StructureType == "casino_coin_pusher")
+			CoinPusherUI.AttachToNode(body, structure.Id);
+		else if (structure.StructureType == "casino_arcade_reaction")
+			ArcadeUI.AttachToNode(body, structure.Id, isPattern: false);
+		else if (structure.StructureType == "casino_arcade_pattern")
+			ArcadeUI.AttachToNode(body, structure.Id, isPattern: true);
+#endif
+
 		return body;
+	}
+
+	private static void AttachStructureInteraction(Node3D node, ulong structureId, string structureType)
+	{
+		if (!structureType.StartsWith("casino_")) return;
+
+		node.SetMeta("structure_id", (long)structureId);
+		node.SetMeta("structure_type", structureType);
+
+		var area = new Area3D { CollisionLayer = 2, CollisionMask = 0 };
+		var shape = new CollisionShape3D();
+		var box = new BoxShape3D { Size = new Vector3(1.5f, 2f, 1.5f) };
+		shape.Shape = box;
+		area.AddChild(shape);
+		node.AddChild(area);
 	}
 
 	// =========================================================================

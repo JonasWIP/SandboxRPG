@@ -43,6 +43,11 @@ public partial class ModManager : Node
             }
         }
 #endif
+
+#if MOD_CASINO
+        if (IsEnabled("casino"))
+            CasinoUI.Register();
+#endif
     }
 
     public bool IsEnabled(string modId) => _enabledMods.Contains(modId);
