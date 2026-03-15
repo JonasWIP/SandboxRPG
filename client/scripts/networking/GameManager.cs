@@ -53,6 +53,7 @@ public partial class GameManager : Node
 	[Signal] public delegate void WorldItemChangedEventHandler();
 	[Signal] public delegate void StructureChangedEventHandler();
 	[Signal] public delegate void RecipesLoadedEventHandler();
+	[Signal] public delegate void WorldObjectUpdatedEventHandler(long id, bool removed);
 
 	// =========================================================================
 	// GODOT LIFECYCLE
@@ -111,6 +112,7 @@ public partial class GameManager : Node
 	public void PlaceBuildStructure(string type, float x, float y, float z, float rotY) => Conn?.Reducers.PlaceStructure(type, x, y, z, rotY);
 	public void RemoveBuildStructure(ulong id) => Conn?.Reducers.RemoveStructure(id);
 	public void MoveItemSlot(ulong id, int slot) => Conn?.Reducers.MoveItemToSlot(id, slot);
+	public void DamageWorldObject(ulong id, uint damage) => Conn?.Reducers.DamageWorldObject(id, damage);
 
 	// =========================================================================
 	// DATA ACCESS — READ FROM STDB CLIENT CACHE
@@ -136,9 +138,11 @@ public partial class GameManager : Node
 				yield return item;
 	}
 
-	public IEnumerable<WorldItem>      GetAllWorldItems() { if (Conn != null) foreach (var i in Conn.Db.WorldItem.Iter())        yield return i; }
-	public IEnumerable<PlacedStructure> GetAllStructures() { if (Conn != null) foreach (var s in Conn.Db.PlacedStructure.Iter()) yield return s; }
-	public IEnumerable<CraftingRecipe> GetAllRecipes()    { if (Conn != null) foreach (var r in Conn.Db.CraftingRecipe.Iter())   yield return r; }
+	public IEnumerable<WorldItem>      GetAllWorldItems()    { if (Conn != null) foreach (var i in Conn.Db.WorldItem.Iter())        yield return i; }
+	public IEnumerable<PlacedStructure> GetAllStructures()  { if (Conn != null) foreach (var s in Conn.Db.PlacedStructure.Iter()) yield return s; }
+	public IEnumerable<CraftingRecipe> GetAllRecipes()      { if (Conn != null) foreach (var r in Conn.Db.CraftingRecipe.Iter())   yield return r; }
+	public IEnumerable<WorldObject>    GetAllWorldObjects() { if (Conn != null) foreach (var o in Conn.Db.WorldObject.Iter())      yield return o; }
+	public WorldObject? GetWorldObject(ulong id) => Conn?.Db.WorldObject.Id.Find(id);
 
 	// =========================================================================
 	// PRIVATE — CONNECTION IMPLEMENTATION
@@ -254,6 +258,9 @@ public partial class GameManager : Node
 		conn.Db.PlacedStructure.OnDelete += (ctx, _) => CallDeferred(nameof(EmitStructureChanged));
 
 		conn.Db.CraftingRecipe.OnInsert += (ctx, _) => CallDeferred(nameof(EmitRecipesLoaded));
+
+		conn.Db.WorldObject.OnInsert += (ctx, o) => CallDeferred(nameof(EmitWorldObjectUpdated), (long)o.Id, false);
+		conn.Db.WorldObject.OnDelete += (ctx, o) => CallDeferred(nameof(EmitWorldObjectUpdated), (long)o.Id, true);
 	}
 
 	// Deferred signal emitters (thread-safe hop back to main thread)
@@ -264,6 +271,7 @@ public partial class GameManager : Node
 	private void EmitWorldItemChanged()        => EmitSignal(SignalName.WorldItemChanged);
 	private void EmitStructureChanged()        => EmitSignal(SignalName.StructureChanged);
 	private void EmitRecipesLoaded()           => EmitSignal(SignalName.RecipesLoaded);
+	private void EmitWorldObjectUpdated(long id, bool removed) => EmitSignal(SignalName.WorldObjectUpdated, id, removed);
 
 	// =========================================================================
 	// AUTH TOKEN PERSISTENCE
