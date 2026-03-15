@@ -4,8 +4,9 @@ using SpacetimeDB.Types;
 namespace SandboxRPG;
 
 /// <summary>
-/// Handles player interactions with world objects (pickup, use, etc.)
-/// Uses raycasting from the camera to detect interactable objects.
+/// Handles player interactions:
+/// - Proximity detection for nearby WorldItems (pickup with E)
+/// - Raycast detection for WorldObjects like trees and rocks (harvest with E)
 /// </summary>
 public partial class InteractionSystem : Node
 {
@@ -16,7 +17,6 @@ public partial class InteractionSystem : Node
 
     public override void _Ready()
     {
-        // Create interaction hint UI
         _interactionHint = new Label
         {
             Text = "",
@@ -36,11 +36,9 @@ public partial class InteractionSystem : Node
 
     public override void _Process(double delta)
     {
-        // Find the camera
         _camera ??= GetViewport()?.GetCamera3D();
         if (_camera == null) return;
 
-        // Raycast from camera center
         var spaceState = _camera.GetWorld3D()?.DirectSpaceState;
         if (spaceState == null) return;
 
@@ -48,14 +46,18 @@ public partial class InteractionSystem : Node
         var from = _camera.ProjectRayOrigin(screenCenter);
         var to = from + _camera.ProjectRayNormal(screenCenter) * InteractionRange;
 
-        // For interaction detection, we check nearby world items
-        CheckNearbyWorldItems();
+        // World items (proximity) take priority
+        if (CheckNearbyWorldItems()) return;
+
+        // Fall back to raycast for world objects (trees, rocks, bushes)
+        CheckWorldObjectRaycast(spaceState, from, to);
     }
 
-    private void CheckNearbyWorldItems()
+    // Returns true if a nearby world item was found and hint shown
+    private bool CheckNearbyWorldItems()
     {
         var localPlayer = GameManager.Instance.GetLocalPlayer();
-        if (localPlayer == null) return;
+        if (localPlayer == null) return false;
 
         var playerPos = new Vector3(localPlayer.PosX, localPlayer.PosY, localPlayer.PosZ);
         WorldItem? closestItem = null;
@@ -72,19 +74,53 @@ public partial class InteractionSystem : Node
             }
         }
 
-        if (closestItem != null && _interactionHint != null)
+        if (closestItem == null)
+        {
+            if (_interactionHint != null) _interactionHint.Visible = false;
+            return false;
+        }
+
+        if (_interactionHint != null)
         {
             _interactionHint.Text = $"[E] Pick up {closestItem.ItemType} x{closestItem.Quantity}";
             _interactionHint.Visible = true;
-
-            if (Input.IsActionJustPressed("interact"))
-            {
-                GameManager.Instance.PickupWorldItem(closestItem.Id);
-            }
         }
-        else if (_interactionHint != null)
+
+        if (Input.IsActionJustPressed("interact"))
+            GameManager.Instance.PickupWorldItem(closestItem.Id);
+
+        return true;
+    }
+
+    private void CheckWorldObjectRaycast(PhysicsDirectSpaceState3D spaceState, Vector3 from, Vector3 to)
+    {
+        var query = PhysicsRayQueryParameters3D.Create(from, to);
+        var result = spaceState.IntersectRay(query);
+
+        if (result.Count == 0 || !result.ContainsKey("collider"))
         {
-            _interactionHint.Visible = false;
+            if (_interactionHint != null) _interactionHint.Visible = false;
+            return;
+        }
+
+        var collider = result["collider"].As<Node>();
+        if (collider == null || !collider.IsInGroup("world_object"))
+        {
+            if (_interactionHint != null) _interactionHint.Visible = false;
+            return;
+        }
+
+        var objectType = collider.GetMeta("object_type", "object").AsString();
+        if (_interactionHint != null)
+        {
+            _interactionHint.Text = $"[E] Harvest {objectType}";
+            _interactionHint.Visible = true;
+        }
+
+        if (Input.IsActionJustPressed("interact"))
+        {
+            var id = (ulong)collider.GetMeta("world_object_id", 0L).AsInt64();
+            GameManager.Instance.DamageWorldObject(id, 25);
         }
     }
 }
