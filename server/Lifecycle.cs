@@ -69,6 +69,10 @@ public static partial class Module
 
             Log.Info($"New player created: {identity}");
         }
+
+#if MOD_CURRENCY
+        GrantStartingBalance(ctx, ctx.Sender);
+#endif
     }
 
     [Reducer(ReducerKind.ClientDisconnected)]

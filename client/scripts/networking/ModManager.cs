@@ -30,6 +30,19 @@ public partial class ModManager : Node
         var sorted = TopologicalSort(enabled);
         _enabledMods.AddRange(sorted);
         GD.Print($"[ModManager] Active mods: {string.Join(", ", _enabledMods)}");
+
+#if MOD_CURRENCY
+        if (IsEnabled("currency"))
+        {
+            var hud = GetNode<Node>("/root/Main/HUD");
+            if (hud != null && hud.FindChild("CurrencyHUD") == null)
+            {
+                var currencyHud = new CurrencyHUD();
+                currencyHud.Name = "CurrencyHUD";
+                hud.AddChild(currencyHud);
+            }
+        }
+#endif
     }
 
     public bool IsEnabled(string modId) => _enabledMods.Contains(modId);
