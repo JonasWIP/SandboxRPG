@@ -8,7 +8,7 @@ public static partial class Module
     // Terrain defaults — must match the TerrainConfig row inserted in SeedTerrainConfig.
     private const uint  TerrainSeed      = 42;
     private const float TerrainNoiseScale = 0.04f;
-    private const float TerrainNoiseAmp   = 1.5f;
+    private const float TerrainNoiseAmp   = 1.2f;
     private const float TerrainWorldSize  = 500f;
 
     // =========================================================================
@@ -124,10 +124,10 @@ public static partial class Module
     /// <summary>Mirrors client Terrain.HeightAt — must stay in sync with module constants.</summary>
     private static float TerrainHeightAt(float x, float z)
     {
-        if (z < 0f) return (float)Math.Max(z * 0.3, -3.0);
-        double t     = Math.Clamp((z - 2.0) / 15.0, 0.0, 1.0);
+        if (z < 0f) return (float)Math.Max(z * 0.15, -3.0);
+        double t     = Math.Clamp((z - 5.0) / 30.0, 0.0, 1.0);
         double baseH = t * t * (3.0 - 2.0 * t) * 2.0;
-        double nr    = Math.Clamp((z - 5.0) / 15.0, 0.0, 1.0);
+        double nr    = Math.Clamp((z - 8.0) / 20.0, 0.0, 1.0);
         double s     = TerrainSeed * 0.001;
         double noise = Math.Sin(x * TerrainNoiseScale + s) * Math.Cos(z * TerrainNoiseScale * 1.7 + s * 1.3) * TerrainNoiseAmp
                      + Math.Sin((x + z) * TerrainNoiseScale * 2.9 + s * 0.7) * TerrainNoiseAmp * 0.3;
