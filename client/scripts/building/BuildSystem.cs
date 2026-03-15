@@ -72,7 +72,6 @@ public partial class BuildSystem : Node
 	private void UpdateGhostPosition()
 	{
 		if (_camera == null) return;
-
 		var spaceState = _camera.GetWorld3D()?.DirectSpaceState;
 		if (spaceState == null) return;
 
@@ -80,35 +79,18 @@ public partial class BuildSystem : Node
 		var from = _camera.ProjectRayOrigin(screenCenter);
 		var dir  = _camera.ProjectRayNormal(screenCenter);
 
-		var query = PhysicsRayQueryParameters3D.Create(from, from + dir * PlaceRange);
-		var result = spaceState.IntersectRay(query);
+		var result = spaceState.IntersectRay(PhysicsRayQueryParameters3D.Create(from, from + dir * PlaceRange));
 		if (result.Count == 0) return;
 
 		var hitPos = (Vector3)result["position"];
-		var normal = (Vector3)result["normal"];
-
-		// Grid snap X/Z; Y from terrain surface hit
 		hitPos.X = Mathf.Round(hitPos.X / GridSize) * GridSize;
 		hitPos.Z = Mathf.Round(hitPos.Z / GridSize) * GridSize;
 
-		if (_ghostPreview == null)
-			CreateGhostPreview(_currentGhostType!);
-
+		if (_ghostPreview == null) CreateGhostPreview(_currentGhostType!);
 		if (_ghostPreview == null) return;
 
-		// Align ghost up-axis to terrain normal, then apply player Y rotation on top.
-		// Use Vector3.Right as fallback when normal is parallel to Vector3.Forward
-		// (avoids zero cross-product on vertical surfaces).
-		var up    = normal.Normalized();
-		var right = up.Cross(Vector3.Forward);
-		if (right.LengthSquared() < 0.001f)
-			right = up.Cross(Vector3.Right);
-		right = right.Normalized();
-		var forward      = right.Cross(up).Normalized();
-		var surfaceBasis = new Basis(right, up, -forward);
-		var yRotBasis    = Basis.FromEuler(new Vector3(0, Mathf.DegToRad(_ghostRotationY), 0));
-
-		_ghostPreview.GlobalTransform = new Transform3D(surfaceBasis * yRotBasis, hitPos);
+		var yRot = Basis.FromEuler(new Vector3(0, Mathf.DegToRad(_ghostRotationY), 0));
+		_ghostPreview.GlobalTransform = new Transform3D(yRot, hitPos);
 	}
 
 	private void CreateGhostPreview(string structureType)
