@@ -26,7 +26,7 @@ public partial class Terrain : StaticBody3D
         if (z >= 0f)
         {
             float t = Mathf.Clamp((z - 2f) / 15f, 0f, 1f);
-            return Mathf.SmoothStep(0f, 2f, t);
+            return 2f * t * t * (3f - 2f * t);   // manual smoothstep 0→2
         }
         // Ocean floor — drops 0.3 units per unit of negative Z, clamped at -3
         return Mathf.Max(z * 0.3f, -3f);

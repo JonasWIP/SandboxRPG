@@ -399,7 +399,9 @@ public partial class WorldManager : Node3D
 		};
 		body.AddChild(collider);
 
-		body.Position = new Vector3(obj.PosX, obj.PosY, obj.PosZ);
+		// Snap Y to client terrain height — ignores any server/client formula drift
+		float groundY = Terrain.HeightAt(obj.PosX, obj.PosZ);
+		body.Position = new Vector3(obj.PosX, groundY, obj.PosZ);
 		body.Rotation = new Vector3(0, obj.RotY, 0);
 		body.AddToGroup("world_object");
 		body.SetMeta("world_object_id", (long)obj.Id);
