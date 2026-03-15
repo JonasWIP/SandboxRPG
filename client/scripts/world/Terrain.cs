@@ -1,118 +1,117 @@
 using Godot;
+using System;
 using System.Collections.Generic;
 
 namespace SandboxRPG;
 
 /// <summary>
-/// Generates the coastal terrain mesh and collision at runtime.
-/// Beach (Z ≤ 5) is flat at Y=0; smooth rise to Y=4 by Z=25; plateau beyond.
-/// Must be a child of (or itself be) a StaticBody3D with a MeshInstance3D and
-/// CollisionShape3D child — see Task 13 for scene setup.
+/// Generates the terrain mesh and collision from server-authoritative TerrainConfig.
+/// Subscribe to GameManager.TerrainConfigChanged to regenerate when the server updates config.
+/// HeightAt() is static so other systems (WorldManager, BuildSystem) can query ground height.
 /// </summary>
 public partial class Terrain : StaticBody3D
 {
-    [Export] public int Subdivisions = 50;   // quads per axis
-    [Export] public float WorldSize  = 100f;
-    [Export] public float MaxHeight  = 4f;
-    [Export] public float BeachEnd   = 5f;
-    [Export] public float SlopeWidth = 20f;
+    [Export] public int Subdivisions = 100;
     [Export] public Material? TerrainMaterial;
 
-    /// <summary>Height at world position (X, Z). Used by other systems for Y placement.
-    /// Z≥0: flat beach (Z 0→2) then smooth rise to Y=2 plateau by Z=17.
-    /// Z&lt;0: smooth dip below ocean surface so the ocean plane (Y=-0.2) shows through.</summary>
+    // Noise params — updated from TerrainConfig, defaults match server seed values
+    private static uint  _seed      = 42;
+    private static float _noiseScale = 0.04f;
+    private static float _noiseAmp   = 1.5f;
+    private static float _worldSize  = 500f;
+
+    public static float WorldSize => _worldSize;
+
+    /// <summary>World-space height at (x, z). Identical formula to server TerrainHeightAt.</summary>
     public static float HeightAt(float x, float z)
     {
-        if (z >= 0f)
-        {
-            float t = Mathf.Clamp((z - 2f) / 15f, 0f, 1f);
-            return 2f * t * t * (3f - 2f * t);   // manual smoothstep 0→2
-        }
-        // Ocean floor — drops 0.3 units per unit of negative Z, clamped at -3
-        return Mathf.Max(z * 0.3f, -3f);
+        if (z < 0f) return Mathf.Max(z * 0.3f, -3f);
+        float t     = Mathf.Clamp((z - 2f) / 15f, 0f, 1f);
+        float baseH = 2f * t * t * (3f - 2f * t);
+        float nr    = Mathf.Clamp((z - 5f) / 15f, 0f, 1f);
+        float s     = _seed * 0.001f;
+        float noise = (float)(
+            Math.Sin(x * _noiseScale + s) * Math.Cos(z * _noiseScale * 1.7 + s * 1.3) * _noiseAmp
+          + Math.Sin((x + z) * _noiseScale * 2.9 + s * 0.7) * _noiseAmp * 0.3
+        );
+        return baseH + noise * nr;
     }
 
     public override void _Ready()
     {
         GD.Print("[Terrain] _Ready called");
+        var gm = GameManager.Instance;
+        gm.TerrainConfigChanged += OnTerrainConfigChanged;
+
+        var cfg = gm.GetTerrainConfig();
+        if (cfg != null) ApplyConfig(cfg);
+
         GenerateMesh();
         GenerateCollision();
+    }
+
+    private void OnTerrainConfigChanged()
+    {
+        var cfg = GameManager.Instance.GetTerrainConfig();
+        if (cfg == null) return;
+        ApplyConfig(cfg);
+        GenerateMesh();
+        GenerateCollision();
+    }
+
+    private static void ApplyConfig(SpacetimeDB.Types.TerrainConfig cfg) // cfg is a class, not a struct
+    {
+        _seed       = cfg.Seed;
+        _noiseScale = cfg.NoiseScale;
+        _noiseAmp   = cfg.NoiseAmplitude;
+        _worldSize  = cfg.WorldSize;
     }
 
     private void GenerateMesh()
     {
         var meshInstance = GetNode<MeshInstance3D>("MeshInstance3D");
         meshInstance.Mesh = BuildArrayMesh();
-
-        // Use exported material if set, otherwise load shader from path
-        Material? mat = TerrainMaterial;
-        if (mat == null)
-        {
-            const string shaderPath = "res://assets/shaders/terrain_blend.gdshader";
-            if (ResourceLoader.Exists(shaderPath))
-            {
-                var shader = ResourceLoader.Load<Shader>(shaderPath);
-                mat = new ShaderMaterial { Shader = shader };
-            }
-        }
-
-        if (mat != null)
-            meshInstance.SetSurfaceOverrideMaterial(0, mat);
+        if (TerrainMaterial != null)
+            meshInstance.SetSurfaceOverrideMaterial(0, TerrainMaterial);
         else
-            GD.PrintErr("[Terrain] No material could be applied!");
+            GD.PrintErr("[Terrain] No TerrainMaterial assigned!");
     }
 
     private void GenerateCollision()
     {
-        var shape = GetNode<CollisionShape3D>("CollisionShape3D");
-
+        var shape   = GetNode<CollisionShape3D>("CollisionShape3D");
         int mapSize = Subdivisions + 1;
-        float[] heights = new float[mapSize * mapSize];
-        float step = WorldSize / Subdivisions;
+        float step  = _worldSize / Subdivisions;
+        var heights = new float[mapSize * mapSize];
 
         for (int z = 0; z < mapSize; z++)
         for (int x = 0; x < mapSize; x++)
-        {
-            float worldX = x * step - WorldSize / 2f;
-            float worldZ = z * step - WorldSize / 2f;
-            heights[z * mapSize + x] = HeightAt(worldX, worldZ);
-        }
+            heights[z * mapSize + x] = HeightAt(x * step - _worldSize / 2f, z * step - _worldSize / 2f);
 
-        var heightmap = new HeightMapShape3D();
-        heightmap.MapWidth  = mapSize;
-        heightmap.MapDepth  = mapSize;
-        heightmap.MapData   = heights;
-        shape.Shape = heightmap;
-
-        // HeightMapShape3D is centred at origin; scale to match world size
-        shape.Scale = new Vector3(WorldSize / Subdivisions, 1f, WorldSize / Subdivisions);
+        shape.Shape = new HeightMapShape3D { MapWidth = mapSize, MapDepth = mapSize, MapData = heights };
+        shape.Scale = new Vector3(step, 1f, step);
     }
 
     private ArrayMesh BuildArrayMesh()
     {
-        int verts = (Subdivisions + 1) * (Subdivisions + 1);
-        var positions = new List<Vector3>(verts);
-        var normals   = new List<Vector3>(verts);
-        var uvs       = new List<Vector2>(verts);
-        var indices   = new List<int>(Subdivisions * Subdivisions * 6);
-
-        float step = WorldSize / Subdivisions;
+        int   n      = Subdivisions + 1;
+        float step   = _worldSize / Subdivisions;
         float uvStep = 1f / Subdivisions;
+
+        var positions = new List<Vector3>(n * n);
+        var normals   = new List<Vector3>(n * n);
+        var uvs       = new List<Vector2>(n * n);
+        var indices   = new List<int>(Subdivisions * Subdivisions * 6);
 
         for (int z = 0; z <= Subdivisions; z++)
         for (int x = 0; x <= Subdivisions; x++)
         {
-            float wx = x * step - WorldSize / 2f;
-            float wz = z * step - WorldSize / 2f;
+            float wx = x * step - _worldSize / 2f;
+            float wz = z * step - _worldSize / 2f;
             float wy = HeightAt(wx, wz);
-
             positions.Add(new Vector3(wx, wy, wz));
             uvs.Add(new Vector2(x * uvStep, z * uvStep));
-
-            // Approximate normal via finite difference
-            float hR = HeightAt(wx + 0.1f, wz);
-            float hF = HeightAt(wx, wz + 0.1f);
-            normals.Add(new Vector3(wy - hR, 0.1f, wy - hF).Normalized());
+            normals.Add(new Vector3(wy - HeightAt(wx + 0.1f, wz), 0.1f, wy - HeightAt(wx, wz + 0.1f)).Normalized());
         }
 
         int w = Subdivisions + 1;
