@@ -178,7 +178,9 @@ public partial class WorldManager : Node3D
 			var model = ResourceLoader.Load<PackedScene>(modelPath).Instantiate<Node3D>();
 			model.Position = new Vector3(0, 0.1f, 0);
 			body.AddChild(model);
-			body.AddChild(new CollisionShape3D { Shape = BuildConvexShape(model, 1.0f) });
+			var convex = BuildConvexShape(model, 1.0f);
+			Shape3D itemShape = convex.Points.Length > 0 ? convex : new SphereShape3D { Radius = 0.15f };
+			body.AddChild(new CollisionShape3D { Shape = itemShape });
 		}
 		else
 		{
@@ -304,7 +306,7 @@ public partial class WorldManager : Node3D
 
 	private StaticBody3D CreateStructureVisual(PlacedStructure structure)
 	{
-		var body = new StaticBody3D { Name = $"Structure_{structure.Id}" };
+		var body = new StaticBody3D { Name = $"Structure_{structure.Id}", CollisionLayer = 1, CollisionMask = 1 };
 
 		string? modelPath = StructureModelPath(structure.StructureType);
 
@@ -414,7 +416,7 @@ public partial class WorldManager : Node3D
 		foreach (var mi in model.FindChildren("*", "MeshInstance3D", owned: false).OfType<MeshInstance3D>())
 		{
 			if (mi.Mesh is not ArrayMesh arrayMesh) continue;
-			var shape = arrayMesh.CreateConvexShape(clean: true, simplify: true);
+			var shape = arrayMesh.CreateConvexShape(clean: true, simplify: false);
 			pts.AddRange(shape.Points);
 		}
 		for (int i = 0; i < pts.Count; i++)
