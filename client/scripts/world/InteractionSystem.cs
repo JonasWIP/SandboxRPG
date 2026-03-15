@@ -113,11 +113,11 @@ public partial class InteractionSystem : Node
         var objectType = collider.GetMeta("object_type", "object").AsString();
         if (_interactionHint != null)
         {
-            _interactionHint.Text = $"[E] Harvest {objectType}";
+            _interactionHint.Text = $"[LMB] Harvest {objectType}";
             _interactionHint.Visible = true;
         }
 
-        if (Input.IsActionJustPressed("interact"))
+        if (Input.IsActionJustPressed("primary_attack") && !BuildSystem.IsBuildable(Hotbar.Instance?.ActiveItemType))
         {
             var id       = (ulong)collider.GetMeta("world_object_id", 0L).AsInt64();
             var toolType = Hotbar.Instance?.ActiveItemType ?? string.Empty;

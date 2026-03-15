@@ -19,6 +19,9 @@ public partial class BuildSystem : Node
 		"wood_door", "campfire", "workbench", "chest",
 	};
 
+	public static bool IsBuildable(string? itemType) =>
+		itemType != null && BuildableTypes.Contains(itemType);
+
 	private Node3D?   _ghostPreview;
 	private Camera3D? _camera;
 	private string?   _currentGhostType;
@@ -61,7 +64,7 @@ public partial class BuildSystem : Node
 		_rWasPressed = Input.IsKeyPressed(Key.R);
 
 		// Place on left-click
-		if (Input.IsMouseButtonPressed(MouseButton.Left) && _ghostPreview != null)
+		if (Input.IsActionJustPressed("primary_attack") && _ghostPreview != null)
 			PlaceStructure();
 	}
 
