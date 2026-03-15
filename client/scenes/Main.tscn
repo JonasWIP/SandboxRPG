@@ -16,7 +16,7 @@ shader_parameter/blend_height = 0.2
 shader_parameter/blend_sharpness = 4.0
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_ocean"]
-size = Vector2(200, 120)
+size = Vector2(600, 252)
 
 [sub_resource type="StandardMaterial3D" id="Material_ocean"]
 transparency = 1
@@ -55,7 +55,7 @@ TerrainMaterial = SubResource("ShaderMat_terrain")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Terrain"]
 
 [node name="Ocean" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, -30)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -124)
 mesh = SubResource("PlaneMesh_ocean")
 surface_material_override/0 = SubResource("Material_ocean")
 
