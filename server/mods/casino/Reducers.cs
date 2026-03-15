@@ -431,5 +431,45 @@ public static partial class Module
         });
         AdvanceToNextSeat(ctx, machineId, game.RoundId);
     }
+
+    // ── Coin Pusher ───────────────────────────────────────────────────────────
+
+    [Reducer]
+    public static void PushCoin(ReducerContext ctx, ulong machineId, ulong copperAmount)
+    {
+        if (copperAmount == 0) throw new Exception("Amount must be > 0");
+        var stateNullable = ctx.Db.CoinPusherState.MachineId.Find(machineId);
+        if (stateNullable is null) throw new Exception("Coin pusher not found");
+        var state = stateNullable.Value;
+
+        DebitCoins(ctx, ctx.Sender, copperAmount, $"coin_push:{machineId}");
+
+        uint newCount = state.CoinCount + 1;
+        ulong newPool = state.CopperPool + copperAmount;
+        ulong now = NowMicros(ctx);
+
+        if (newCount >= state.JackpotThreshold)
+        {
+            // Jackpot — pay out pool to this player, reset
+            CreditCoins(ctx, ctx.Sender, newPool, $"coin_pusher_jackpot:{machineId}");
+            ctx.Db.CoinPusherState.Delete(state);
+            ctx.Db.CoinPusherState.Insert(new CoinPusherState
+            {
+                MachineId = machineId, CoinCount = 0, CopperPool = 0,
+                LastPusherId = ctx.Sender, LastPushTime = now,
+                JackpotThreshold = state.JackpotThreshold
+            });
+        }
+        else
+        {
+            ctx.Db.CoinPusherState.Delete(state);
+            ctx.Db.CoinPusherState.Insert(new CoinPusherState
+            {
+                MachineId = machineId, CoinCount = newCount, CopperPool = newPool,
+                LastPusherId = ctx.Sender, LastPushTime = now,
+                JackpotThreshold = state.JackpotThreshold
+            });
+        }
+    }
 }
 #endif

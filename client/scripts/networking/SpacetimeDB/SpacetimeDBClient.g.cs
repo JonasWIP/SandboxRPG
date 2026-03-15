@@ -675,6 +675,7 @@ namespace SpacetimeDB.Types
                 Reducer.PickupItem args => Reducers.InvokePickupItem(eventContext, args),
                 Reducer.PlaceBet args => Reducers.InvokePlaceBet(eventContext, args),
                 Reducer.PlaceStructure args => Reducers.InvokePlaceStructure(eventContext, args),
+                Reducer.PushCoin args => Reducers.InvokePushCoin(eventContext, args),
                 Reducer.ReleaseSlot args => Reducers.InvokeReleaseSlot(eventContext, args),
                 Reducer.RemoveStructure args => Reducers.InvokeRemoveStructure(eventContext, args),
                 Reducer.SendChat args => Reducers.InvokeSendChat(eventContext, args),
