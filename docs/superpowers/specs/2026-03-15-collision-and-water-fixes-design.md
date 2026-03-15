@@ -35,17 +35,18 @@ Replace `BuildConvexShape` and `CollectFaces` with a new implementation that use
 
 New helper `BuildConvexShape(Node3D model, float scale)`:
 1. Recursively traverse all `MeshInstance3D` children of `model`
-2. For each mesh, call `mesh.CreateConvexShape(true, true)` to get a `ConvexPolygonShape3D`
-3. Accumulate all `Points` arrays into one combined `List<Vector3>`
-4. Multiply each accumulated point by `scale`
-5. Return a single `ConvexPolygonShape3D { Points = combined.ToArray() }`
+2. For each mesh, cast `mi.Mesh` to `ArrayMesh` — `CreateConvexShape` is only available on `ArrayMesh` in C#, not the base `Mesh` class. Kenney GLBs loaded at runtime are always `ArrayMesh`, so the cast succeeds. Skip non-`ArrayMesh` meshes silently.
+3. Call `arrayMesh.CreateConvexShape(clean: true, simplify: true)` — `simplify: true` uses VHACD single-hull generation, which is intentionally heavier but produces better results for organic shapes like trees and rocks
+4. Accumulate all `Points` arrays from each returned shape into one combined `List<Vector3>`
+5. Multiply each accumulated point by `scale`
+6. Return a single `ConvexPolygonShape3D { Points = combined.ToArray() }`
 
 `CollectFaces` is removed entirely — no longer needed.
 
-**Dropped items** (`CreateWorldItemVisual`):
-- Replace `SphereShape3D { Radius = 0.15f }` with `BuildConvexShape(model, 1.0f)` on the loaded item model
-- Keep `SphereShape3D { Radius = 0.15f }` as fallback when no model GLB exists (same pattern as world objects)
-- The model must be instantiated before calling `BuildConvexShape` (same as world objects)
+**Dropped items** (`CreateWorldItemVisual`): The current code adds `CollisionShape3D` before loading the model. This order must be reversed — the model must be added to the body first so it is available for `BuildConvexShape`, then the collision shape is added:
+1. Add model child to body (`body.AddChild(model)`)
+2. Call `BuildConvexShape(model, 1.0f)` and add the result as `CollisionShape3D`
+3. Keep `SphereShape3D { Radius = 0.15f }` as fallback when no model GLB exists (same pattern as world objects)
 
 ### Files changed
 - `client/scripts/world/WorldManager.cs` — replace `BuildConvexShape` + remove `CollectFaces`; update `CreateWorldItemVisual` collision
@@ -60,13 +61,13 @@ New helper `BuildConvexShape(Node3D model, float scale)`:
 
 ### Design
 
-After snapping X and Z, also snap Y to 0.25f increments:
+After snapping X and Z (and before the `GlobalTransform` assignment), also snap Y to 0.25f increments:
 
 ```csharp
 hitPos.Y = Mathf.Snapped(hitPos.Y, 0.25f);
 ```
 
-Wall tops sit at exact multiples of 2.5 (which is divisible by 0.25), so snapping to 0.25 always lands at the correct stacking height. Terrain placement is unaffected — 0.25f granularity is fine-grained enough for natural surface building.
+`Mathf.Snapped(float, float)` exists in Godot 4 C# and resolves to the `float` overload since `hitPos.Y` is a `float`. Wall tops sit at exact multiples of 2.5 (which is divisible by 0.25), so snapping to 0.25 always lands at the correct stacking height. Terrain placement is unaffected — 0.25f granularity is fine-grained enough for natural surface building.
 
 ### Files changed
 - `client/scripts/building/BuildSystem.cs` — add Y snap in `UpdateGhostPosition`
