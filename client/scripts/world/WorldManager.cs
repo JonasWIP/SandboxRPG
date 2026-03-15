@@ -160,57 +160,79 @@ public partial class WorldManager : Node3D
 
 	private Node3D CreateWorldItemVisual(WorldItem item)
 	{
-		var node = new Node3D { Name = $"WorldItem_{item.Id}" };
-
-		string? modelPath = item.ItemType switch
+		var body = new RigidBody3D
 		{
-			"wood"   => "res://assets/models/survival/resource-wood.glb",
-			"stone"  => "res://assets/models/survival/resource-stone.glb",
-			"planks" => "res://assets/models/survival/resource-planks.glb",
-			_        => null,
+			Name       = $"WorldItem_{item.Id}",
+			LinearDamp = 2.0f,
 		};
 
+		// Collision so it lands on terrain
+		body.AddChild(new CollisionShape3D { Shape = new SphereShape3D { Radius = 0.15f } });
+
+		// Visual
+		var modelPath = WorldItemModelPath(item.ItemType);
 		if (modelPath != null && ResourceLoader.Exists(modelPath))
 		{
-			var scene = ResourceLoader.Load<PackedScene>(modelPath);
-			node.AddChild(scene.Instantiate<Node3D>());
+			var model = ResourceLoader.Load<PackedScene>(modelPath).Instantiate<Node3D>();
+			model.Position = new Vector3(0, 0.1f, 0);
+			body.AddChild(model);
 		}
 		else
 		{
-			var mesh = new MeshInstance3D
-			{
-				Mesh = new BoxMesh { Size = new Vector3(0.4f, 0.4f, 0.4f) },
-				Position = new Vector3(0, 0.2f, 0),
-			};
-			mesh.MaterialOverride = new StandardMaterial3D
-			{
-				AlbedoColor = item.ItemType switch
-				{
-					"wood"   => new Color(0.6f, 0.4f, 0.2f),
-					"stone"  => new Color(0.5f, 0.5f, 0.55f),
-					"iron"   => new Color(0.7f, 0.7f, 0.75f),
-					_        => new Color(0.8f, 0.8f, 0.2f),
-				},
-				Roughness = 0.9f,
-			};
-			node.AddChild(mesh);
+			body.AddChild(CreateFallbackItemMesh(item.ItemType));
 		}
 
-		var label = new Label3D
+		body.AddChild(new Label3D
 		{
-			Text = $"{item.ItemType} x{item.Quantity}",
-			FontSize = 32,
-			Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
+			Text        = $"{item.ItemType} x{item.Quantity}",
+			FontSize    = 32,
+			Billboard   = BaseMaterial3D.BillboardModeEnum.Enabled,
 			NoDepthTest = true,
-			Position = new Vector3(0, 0.7f, 0),
+			Position    = new Vector3(0, 0.7f, 0),
+		});
+
+		body.Position = new Vector3(item.PosX, item.PosY, item.PosZ);
+		body.SetMeta("world_item_id", (long)item.Id);
+		body.SetMeta("item_type", item.ItemType);
+		return body;
+	}
+
+	private static string? WorldItemModelPath(string itemType) => itemType switch
+	{
+		"wood"   => "res://assets/models/survival/resource-wood.glb",
+		"stone"  => "res://assets/models/survival/resource-stone.glb",
+		"planks" => "res://assets/models/survival/resource-planks.glb",
+		_        => null,
+	};
+
+	private static MeshInstance3D CreateFallbackItemMesh(string itemType)
+	{
+		var mesh = new MeshInstance3D
+		{
+			Mesh     = new BoxMesh { Size = new Vector3(0.4f, 0.4f, 0.4f) },
+			Position = new Vector3(0, 0.2f, 0),
 		};
-		node.AddChild(label);
+		mesh.MaterialOverride = new StandardMaterial3D
+		{
+			AlbedoColor = itemType switch
+			{
+				"wood"  => new Color(0.6f, 0.4f, 0.2f),
+				"stone" => new Color(0.5f, 0.5f, 0.55f),
+				"iron"  => new Color(0.7f, 0.7f, 0.75f),
+				_       => new Color(0.8f, 0.8f, 0.2f),
+			},
+			Roughness = 0.9f,
+		};
+		return mesh;
+	}
 
-		node.Position = new Vector3(item.PosX, item.PosY, item.PosZ);
-		node.SetMeta("world_item_id", (long)item.Id);
-		node.SetMeta("item_type", item.ItemType);
-
-		return node;
+	/// <summary>Recursively applies a color tint to all MeshInstance3D nodes in the subtree.</summary>
+	private static void TintMeshes(Node root, Color color)
+	{
+		if (root is MeshInstance3D mi)
+			mi.MaterialOverride = new StandardMaterial3D { AlbedoColor = color, Roughness = 0.85f };
+		foreach (Node child in root.GetChildren())
+			TintMeshes(child, color);
 	}
 
 	// =========================================================================
@@ -260,8 +282,16 @@ public partial class WorldManager : Node3D
 
 		if (modelPath != null && ResourceLoader.Exists(modelPath))
 		{
-			var scene = ResourceLoader.Load<PackedScene>(modelPath);
-			node.AddChild(scene.Instantiate<Node3D>());
+			var scene   = ResourceLoader.Load<PackedScene>(modelPath);
+			var visual  = scene.Instantiate<Node3D>();
+			Color? tint = structure.StructureType switch
+			{
+				"wood_wall" or "wood_floor" or "wood_door" => new Color(0.65f, 0.45f, 0.25f),
+				"stone_wall" or "stone_floor"              => new Color(0.6f,  0.6f,  0.65f),
+				_                                           => (Color?)null,
+			};
+			if (tint.HasValue) TintMeshes(visual, tint.Value);
+			node.AddChild(visual);
 		}
 		else
 		{
