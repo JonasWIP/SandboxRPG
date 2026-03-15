@@ -24,6 +24,12 @@ public static partial class Module
         SeedRecipes(ctx);
         SeedWorldItems(ctx);
         SeedWorldObjects(ctx);
+
+        // Seed mod config rows (idempotent — only insert if missing)
+        if (ctx.Db.ModConfig.ModId.Find("currency") == null)
+            ctx.Db.ModConfig.Insert(new ModConfig { ModId = "currency", Enabled = true, Version = "1.0.0", Dependencies = "" });
+        if (ctx.Db.ModConfig.ModId.Find("casino") == null)
+            ctx.Db.ModConfig.Insert(new ModConfig { ModId = "casino", Enabled = true, Version = "1.0.0", Dependencies = "currency" });
     }
 
     [Reducer(ReducerKind.ClientConnected)]
@@ -158,5 +164,65 @@ public static partial class Module
         for (int i = 0; i < 50;  i++)  ctx.Db.WorldObject.Insert(MakeObject("bush",       -100f, 100f,   5f,  50f, 30));
 
         Log.Info("Seeded world objects.");
+    }
+
+    // =========================================================================
+    // MOD FRAMEWORK REDUCERS
+    // =========================================================================
+
+    /// <summary>
+    /// First-run bootstrap. Only succeeds when AdminList is empty.
+    /// Call once to make yourself admin, then others via SetModEnabled.
+    /// </summary>
+    [Reducer]
+    public static void GrantAdmin(ReducerContext ctx, Identity target)
+    {
+        if (ctx.Db.AdminList.Iter().Any())
+            throw new Exception("AdminList already populated. Use an existing admin.");
+        ctx.Db.AdminList.Insert(new AdminList { PlayerId = target });
+    }
+
+    [Reducer]
+    public static void SetModEnabled(ReducerContext ctx, string modId, bool enabled)
+    {
+        // Auth check
+        if (ctx.Db.AdminList.PlayerId.Find(ctx.Sender) == null)
+            throw new Exception("Not authorized");
+
+        var rowNullable = ctx.Db.ModConfig.ModId.Find(modId);
+        if (rowNullable == null)
+            throw new Exception($"Unknown mod: {modId}");
+        var row = rowNullable.Value;
+
+        if (enabled)
+        {
+            // Validate all dependencies are enabled first
+            foreach (var dep in row.Dependencies.Split(',', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var depRow = ctx.Db.ModConfig.ModId.Find(dep);
+                if (depRow == null || !depRow.Value.Enabled)
+                    throw new Exception($"Dependency '{dep}' must be enabled first");
+            }
+        }
+        else
+        {
+            // Validate no enabled mods depend on this one
+            foreach (var other in ctx.Db.ModConfig.Iter())
+            {
+                if (!other.Enabled) continue;
+                var deps = other.Dependencies.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                if (deps.Contains(modId))
+                    throw new Exception($"Mod '{other.ModId}' depends on '{modId}'. Disable it first.");
+            }
+        }
+
+        ctx.Db.ModConfig.Delete(row);
+        ctx.Db.ModConfig.Insert(new ModConfig
+        {
+            ModId = row.ModId,
+            Enabled = enabled,
+            Version = row.Version,
+            Dependencies = row.Dependencies
+        });
     }
 }

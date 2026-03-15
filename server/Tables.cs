@@ -122,4 +122,23 @@ public static partial class Module
         public float NoiseScale;   // spatial frequency of hills
         public float NoiseAmplitude; // max height added by noise
     }
+
+    // --- Mod Framework (always compiled, no #if guard) ---
+
+    [Table(Name = "mod_config", Public = true)]
+    public partial struct ModConfig
+    {
+        [PrimaryKey]
+        public string ModId;
+        public bool Enabled;
+        public string Version;
+        public string Dependencies; // comma-separated mod IDs
+    }
+
+    [Table(Name = "admin_list", Public = true)]
+    public partial struct AdminList
+    {
+        [PrimaryKey]
+        public Identity PlayerId;
+    }
 }

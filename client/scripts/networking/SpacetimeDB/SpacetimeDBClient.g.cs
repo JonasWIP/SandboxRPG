@@ -27,9 +27,11 @@ namespace SpacetimeDB.Types
     {
         public RemoteTables(DbConnection conn)
         {
+            AddTable(AdminList = new(conn));
             AddTable(ChatMessage = new(conn));
             AddTable(CraftingRecipe = new(conn));
             AddTable(InventoryItem = new(conn));
+            AddTable(ModConfig = new(conn));
             AddTable(PlacedStructure = new(conn));
             AddTable(Player = new(conn));
             AddTable(TerrainConfig = new(conn));
@@ -531,9 +533,11 @@ namespace SpacetimeDB.Types
 
         internal static string[] AllTablesSqlQueries() => new string[]
         {
+            new QueryBuilder().From.AdminList().ToSql(),
             new QueryBuilder().From.ChatMessage().ToSql(),
             new QueryBuilder().From.CraftingRecipe().ToSql(),
             new QueryBuilder().From.InventoryItem().ToSql(),
+            new QueryBuilder().From.ModConfig().ToSql(),
             new QueryBuilder().From.PlacedStructure().ToSql(),
             new QueryBuilder().From.Player().ToSql(),
             new QueryBuilder().From.TerrainConfig().ToSql(),
@@ -545,9 +549,11 @@ namespace SpacetimeDB.Types
 
     public sealed class From
     {
+        public global::SpacetimeDB.Table<AdminList, AdminListCols, AdminListIxCols> AdminList() => new("admin_list", new AdminListCols("admin_list"), new AdminListIxCols("admin_list"));
         public global::SpacetimeDB.Table<ChatMessage, ChatMessageCols, ChatMessageIxCols> ChatMessage() => new("chat_message", new ChatMessageCols("chat_message"), new ChatMessageIxCols("chat_message"));
         public global::SpacetimeDB.Table<CraftingRecipe, CraftingRecipeCols, CraftingRecipeIxCols> CraftingRecipe() => new("crafting_recipe", new CraftingRecipeCols("crafting_recipe"), new CraftingRecipeIxCols("crafting_recipe"));
         public global::SpacetimeDB.Table<InventoryItem, InventoryItemCols, InventoryItemIxCols> InventoryItem() => new("inventory_item", new InventoryItemCols("inventory_item"), new InventoryItemIxCols("inventory_item"));
+        public global::SpacetimeDB.Table<ModConfig, ModConfigCols, ModConfigIxCols> ModConfig() => new("mod_config", new ModConfigCols("mod_config"), new ModConfigIxCols("mod_config"));
         public global::SpacetimeDB.Table<PlacedStructure, PlacedStructureCols, PlacedStructureIxCols> PlacedStructure() => new("placed_structure", new PlacedStructureCols("placed_structure"), new PlacedStructureIxCols("placed_structure"));
         public global::SpacetimeDB.Table<Player, PlayerCols, PlayerIxCols> Player() => new("player", new PlayerCols("player"), new PlayerIxCols("player"));
         public global::SpacetimeDB.Table<TerrainConfig, TerrainConfigCols, TerrainConfigIxCols> TerrainConfig() => new("terrain_config", new TerrainConfigCols("terrain_config"), new TerrainConfigIxCols("terrain_config"));
@@ -636,6 +642,7 @@ namespace SpacetimeDB.Types
             {
                 Reducer.CraftItem args => Reducers.InvokeCraftItem(eventContext, args),
                 Reducer.DropItem args => Reducers.InvokeDropItem(eventContext, args),
+                Reducer.GrantAdmin args => Reducers.InvokeGrantAdmin(eventContext, args),
                 Reducer.HarvestWorldObject args => Reducers.InvokeHarvestWorldObject(eventContext, args),
                 Reducer.MoveItemToSlot args => Reducers.InvokeMoveItemToSlot(eventContext, args),
                 Reducer.MovePlayer args => Reducers.InvokeMovePlayer(eventContext, args),
@@ -644,6 +651,7 @@ namespace SpacetimeDB.Types
                 Reducer.RemoveStructure args => Reducers.InvokeRemoveStructure(eventContext, args),
                 Reducer.SendChat args => Reducers.InvokeSendChat(eventContext, args),
                 Reducer.SetColor args => Reducers.InvokeSetColor(eventContext, args),
+                Reducer.SetModEnabled args => Reducers.InvokeSetModEnabled(eventContext, args),
                 Reducer.SetName args => Reducers.InvokeSetName(eventContext, args),
                 _ => throw new ArgumentOutOfRangeException("Reducer", $"Unknown reducer {reducer}")
             };

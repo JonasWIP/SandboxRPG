@@ -1,5 +1,7 @@
 using Godot;
 using SpacetimeDB.Types;
+using System;
+using System.Collections.Generic;
 
 namespace SandboxRPG;
 
@@ -14,6 +16,12 @@ public partial class InteractionSystem : Node
 
     private Camera3D? _camera;
     private Label? _interactionHint;
+
+    // ── Structure handler registry (casino mod registers here) ───────────────
+    private static readonly Dictionary<string, Action<ulong>> _structureHandlers = new();
+
+    public static void RegisterStructureHandler(string structureType, Action<ulong> handler)
+        => _structureHandlers[structureType] = handler;
 
     public override void _Ready()
     {
@@ -48,6 +56,9 @@ public partial class InteractionSystem : Node
 
         // World items (proximity) take priority
         if (CheckNearbyWorldItems()) return;
+
+        // Structure interaction (casino machines via Area3D raycast)
+        if (CheckStructureRaycast(spaceState, from, to)) return;
 
         // Fall back to raycast for world objects (trees, rocks, bushes)
         CheckWorldObjectRaycast(spaceState, from, to);
@@ -123,5 +134,47 @@ public partial class InteractionSystem : Node
             var toolType = Hotbar.Instance?.ActiveItemType ?? string.Empty;
             GameManager.Instance.HarvestWorldObject(id, toolType);
         }
+    }
+
+    // Returns true if a casino structure was aimed at and hint shown
+    private bool CheckStructureRaycast(PhysicsDirectSpaceState3D spaceState, Vector3 from, Vector3 to)
+    {
+        var query = PhysicsRayQueryParameters3D.Create(from, to);
+        query.CollisionMask = 2; // layer 2 = casino machine interaction
+        var result = spaceState.IntersectRay(query);
+
+        if (result.Count == 0 || !result.ContainsKey("collider"))
+        {
+            return false;
+        }
+
+        // Walk up the node tree to find the node with structure metadata
+        var collider = result["collider"].As<Node>();
+        Node? current = collider;
+        while (current != null)
+        {
+            if (current.HasMeta("structure_id") && current.HasMeta("structure_type"))
+            {
+                var structId = (ulong)current.GetMeta("structure_id").AsInt64();
+                var structType = current.GetMeta("structure_type").AsString();
+
+                if (_structureHandlers.ContainsKey(structType))
+                {
+                    if (_interactionHint != null)
+                    {
+                        _interactionHint.Text = $"[E] Use {structType.Replace("casino_", "").Replace("_", " ")}";
+                        _interactionHint.Visible = true;
+                    }
+
+                    if (Input.IsActionJustPressed("interact"))
+                        _structureHandlers[structType](structId);
+
+                    return true;
+                }
+                break;
+            }
+            current = current.GetParent();
+        }
+        return false;
     }
 }
