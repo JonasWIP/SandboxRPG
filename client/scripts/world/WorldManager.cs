@@ -1,6 +1,7 @@
 using Godot;
 using SpacetimeDB.Types;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace SandboxRPG;
 
@@ -170,20 +171,19 @@ public partial class WorldManager : Node3D
 			AxisLockAngularZ = true,
 		};
 
-		// Collision so it lands on terrain
-		body.AddChild(new CollisionShape3D { Shape = new SphereShape3D { Radius = 0.15f } });
-
-		// Visual
+		// Visual — must be added first so BuildConvexShape can find it
 		var modelPath = WorldItemModelPath(item.ItemType);
 		if (modelPath != null && ResourceLoader.Exists(modelPath))
 		{
 			var model = ResourceLoader.Load<PackedScene>(modelPath).Instantiate<Node3D>();
 			model.Position = new Vector3(0, 0.1f, 0);
 			body.AddChild(model);
+			body.AddChild(new CollisionShape3D { Shape = BuildConvexShape(model, 1.0f) });
 		}
 		else
 		{
 			body.AddChild(CreateFallbackItemMesh(item.ItemType));
+			body.AddChild(new CollisionShape3D { Shape = new SphereShape3D { Radius = 0.15f } });
 		}
 
 		body.AddChild(new Label3D
@@ -410,19 +410,16 @@ public partial class WorldManager : Node3D
 
 	private static ConvexPolygonShape3D BuildConvexShape(Node3D model, float scale)
 	{
-		var verts = new List<Vector3>();
-		CollectFaces(model, verts);
-		for (int i = 0; i < verts.Count; i++)
-			verts[i] *= scale;
-		return new ConvexPolygonShape3D { Points = verts.ToArray() };
-	}
-
-	private static void CollectFaces(Node node, List<Vector3> verts)
-	{
-		if (node is MeshInstance3D mi && mi.Mesh != null)
-			verts.AddRange(mi.Mesh.GetFaces());
-		foreach (Node child in node.GetChildren())
-			CollectFaces(child, verts);
+		var pts = new List<Vector3>();
+		foreach (var mi in model.FindChildren("*", "MeshInstance3D", owned: false).OfType<MeshInstance3D>())
+		{
+			if (mi.Mesh is not ArrayMesh arrayMesh) continue;
+			var shape = arrayMesh.CreateConvexShape(clean: true, simplify: true);
+			pts.AddRange(shape.Points);
+		}
+		for (int i = 0; i < pts.Count; i++)
+			pts[i] *= scale;
+		return new ConvexPolygonShape3D { Points = pts.ToArray() };
 	}
 
 	private Node3D CreateWorldObjectVisual(WorldObject obj)
