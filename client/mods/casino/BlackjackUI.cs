@@ -1,6 +1,7 @@
 #if MOD_CASINO
 using Godot;
 using SandboxRPG;
+using System;
 using System.Collections.Generic;
 using SpacetimeDB.Types;
 
@@ -19,6 +20,7 @@ public partial class BlackjackUI : Node3D
     private readonly Dictionary<string, MeshInstance3D> _cardNodes = new();
     private static readonly Vector3 FeltOrigin = new(0f, 0.55f, 0f);
     private const float CardSpacing = 0.22f;
+    private Action? _unsubscribeAll;
 
     public static void Open(ulong machineId)
     {
@@ -36,10 +38,22 @@ public partial class BlackjackUI : Node3D
 
     public override void _Ready()
     {
-        GameManager.Instance.Conn.Db.BlackjackSeat.OnInsert += (_, _) => CallDeferred(nameof(RefreshCards));
-        GameManager.Instance.Conn.Db.BlackjackSeat.OnUpdate += (_, _, _) => CallDeferred(nameof(RefreshCards));
-        GameManager.Instance.Conn.Db.BlackjackSeat.OnDelete += (_, _) => CallDeferred(nameof(RefreshCards));
-        GameManager.Instance.Conn.Db.BlackjackGame.OnUpdate += (_, _, _) => CallDeferred(nameof(RefreshCards));
+        void onSeatInsert(EventContext ctx, BlackjackSeat s) => CallDeferred(nameof(RefreshCards));
+        void onSeatUpdate(EventContext ctx, BlackjackSeat o, BlackjackSeat n) => CallDeferred(nameof(RefreshCards));
+        void onSeatDelete(EventContext ctx, BlackjackSeat s) => CallDeferred(nameof(RefreshCards));
+        void onGameUpdate(EventContext ctx, BlackjackGame o, BlackjackGame n) => CallDeferred(nameof(RefreshCards));
+
+        GameManager.Instance.Conn.Db.BlackjackSeat.OnInsert += onSeatInsert;
+        GameManager.Instance.Conn.Db.BlackjackSeat.OnUpdate += onSeatUpdate;
+        GameManager.Instance.Conn.Db.BlackjackSeat.OnDelete += onSeatDelete;
+        GameManager.Instance.Conn.Db.BlackjackGame.OnUpdate += onGameUpdate;
+
+        _unsubscribeAll = () => {
+            GameManager.Instance.Conn.Db.BlackjackSeat.OnInsert -= onSeatInsert;
+            GameManager.Instance.Conn.Db.BlackjackSeat.OnUpdate -= onSeatUpdate;
+            GameManager.Instance.Conn.Db.BlackjackSeat.OnDelete -= onSeatDelete;
+            GameManager.Instance.Conn.Db.BlackjackGame.OnUpdate -= onGameUpdate;
+        };
     }
 
     private void ShowSeatPopup()
@@ -165,6 +179,7 @@ public partial class BlackjackUI : Node3D
     public override void _ExitTree()
     {
         _instances.Remove(_machineId);
+        _unsubscribeAll?.Invoke();
     }
 }
 #endif

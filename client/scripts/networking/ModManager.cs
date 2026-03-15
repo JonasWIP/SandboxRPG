@@ -34,7 +34,7 @@ public partial class ModManager : Node
 #if MOD_CURRENCY
         if (IsEnabled("currency"))
         {
-            var hud = GetNode<Node>("/root/Main/HUD");
+            var hud = GetNodeOrNull<Node>("/root/Main/UILayer/HUD");
             if (hud != null && hud.FindChild("CurrencyHUD") == null)
             {
                 var currencyHud = new CurrencyHUD();
