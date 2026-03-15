@@ -671,11 +671,13 @@ namespace SpacetimeDB.Types
                 Reducer.MovePlayer args => Reducers.InvokeMovePlayer(eventContext, args),
                 Reducer.PickupItem args => Reducers.InvokePickupItem(eventContext, args),
                 Reducer.PlaceStructure args => Reducers.InvokePlaceStructure(eventContext, args),
+                Reducer.ReleaseSlot args => Reducers.InvokeReleaseSlot(eventContext, args),
                 Reducer.RemoveStructure args => Reducers.InvokeRemoveStructure(eventContext, args),
                 Reducer.SendChat args => Reducers.InvokeSendChat(eventContext, args),
                 Reducer.SetColor args => Reducers.InvokeSetColor(eventContext, args),
                 Reducer.SetModEnabled args => Reducers.InvokeSetModEnabled(eventContext, args),
                 Reducer.SetName args => Reducers.InvokeSetName(eventContext, args),
+                Reducer.SpinSlot args => Reducers.InvokeSpinSlot(eventContext, args),
                 Reducer.WithdrawCoins args => Reducers.InvokeWithdrawCoins(eventContext, args),
                 _ => throw new ArgumentOutOfRangeException("Reducer", $"Unknown reducer {reducer}")
             };
