@@ -14,6 +14,7 @@ public static partial class Module
     public static void Init(ReducerContext ctx)
     {
         Log.Info("SandboxRPG server module initialized!");
+        SeedTerrainConfig(ctx);
         SeedRecipes(ctx);
         SeedWorldItems(ctx);
         SeedWorldObjects(ctx);
@@ -101,22 +102,40 @@ public static partial class Module
         Log.Info("Seeded starter world items.");
     }
 
-    /// <summary>Mirrors the client Terrain.HeightAt formula (no Mathf on server).</summary>
+    private static void SeedTerrainConfig(ReducerContext ctx)
+    {
+        ctx.Db.TerrainConfig.Insert(new TerrainConfig
+        {
+            Id             = 0,
+            Seed           = 42,
+            WorldSize      = 500f,
+            NoiseScale     = 0.04f,
+            NoiseAmplitude = 1.5f,
+        });
+        Log.Info("Seeded terrain config.");
+    }
+
+    /// <summary>Mirrors client Terrain.HeightAt. Seed/noise constants must match TerrainConfig defaults.</summary>
     private static float TerrainHeightAt(float x, float z)
     {
-        if (z >= 0f)
-        {
-            float t = Math.Clamp((z - 2f) / 15f, 0f, 1f);
-            return t * t * (3f - 2f * t) * 2f;   // SmoothStep(0, 2, t)
-        }
-        return Math.Max(z * 0.3f, -3f);   // Ocean floor
+        const uint  Seed  = 42;
+        const float NScl  = 0.04f;
+        const float NAmp  = 1.5f;
+
+        if (z < 0f) return (float)Math.Max(z * 0.3, -3.0);
+        double t     = Math.Clamp((z - 2.0) / 15.0, 0.0, 1.0);
+        double baseH = t * t * (3.0 - 2.0 * t) * 2.0;
+        double nr    = Math.Clamp((z - 5.0) / 15.0, 0.0, 1.0);
+        double s     = Seed * 0.001;
+        double noise = Math.Sin(x * NScl + s) * Math.Cos(z * NScl * 1.7 + s * 1.3) * NAmp
+                     + Math.Sin((x + z) * NScl * 2.9 + s * 0.7) * NAmp * 0.3;
+        return (float)(baseH + noise * nr);
     }
 
     private static void SeedWorldObjects(ReducerContext ctx)
     {
-        var rng = new Random(42);   // fixed seed — same world every restart
+        var rng = new Random(42);
 
-        // Helper: random position in range with terrain-height Y
         WorldObject MakeObject(string type, float xMin, float xMax, float zMin, float zMax, uint hp)
         {
             float x = (float)(rng.NextDouble() * (xMax - xMin) + xMin);
@@ -124,34 +143,17 @@ public static partial class Module
             return new WorldObject
             {
                 ObjectType = type,
-                PosX = x,
-                PosY = TerrainHeightAt(x, z),
-                PosZ = z,
+                PosX = x, PosY = TerrainHeightAt(x, z), PosZ = z,
                 RotY = (float)(rng.NextDouble() * Math.PI * 2),
-                Health = hp,
-                MaxHealth = hp,
+                Health = hp, MaxHealth = hp,
             };
         }
 
-        // Pine trees — inland plateau
-        for (int i = 0; i < 50; i++)
-            ctx.Db.WorldObject.Insert(MakeObject("tree_pine", -40f, 40f, 20f, 48f, 100));
-
-        // Dead trees / stumps — at treeline
-        for (int i = 0; i < 12; i++)
-            ctx.Db.WorldObject.Insert(MakeObject("tree_dead", -30f, 30f, 15f, 25f, 60));
-
-        // Large rocks — scattered beach and hillside
-        for (int i = 0; i < 18; i++)
-            ctx.Db.WorldObject.Insert(MakeObject("rock_large", -40f, 40f, 0f, 30f, 150));
-
-        // Small rocks — scattered everywhere
-        for (int i = 0; i < 15; i++)
-            ctx.Db.WorldObject.Insert(MakeObject("rock_small", -45f, 45f, -5f, 35f, 80));
-
-        // Bushes — near spawn clearing
-        for (int i = 0; i < 10; i++)
-            ctx.Db.WorldObject.Insert(MakeObject("bush", -20f, 20f, 5f, 18f, 30));
+        for (int i = 0; i < 250; i++)  ctx.Db.WorldObject.Insert(MakeObject("tree_pine",  -200f, 200f,  30f, 230f, 100));
+        for (int i = 0; i < 60;  i++)  ctx.Db.WorldObject.Insert(MakeObject("tree_dead",  -150f, 150f,  20f,  60f, 60));
+        for (int i = 0; i < 90;  i++)  ctx.Db.WorldObject.Insert(MakeObject("rock_large", -200f, 200f,   0f, 150f, 150));
+        for (int i = 0; i < 75;  i++)  ctx.Db.WorldObject.Insert(MakeObject("rock_small", -220f, 220f, -20f, 170f, 80));
+        for (int i = 0; i < 50;  i++)  ctx.Db.WorldObject.Insert(MakeObject("bush",       -100f, 100f,   5f,  50f, 30));
 
         Log.Info("Seeded world objects.");
     }
