@@ -6,7 +6,7 @@ namespace SandboxRPG;
 /// Building system — no separate build mode toggle.
 /// Building is active automatically when the selected hotbar slot holds a
 /// placeable structure item.  Left-click places, R rotates the ghost 90° steps.
-/// Ghost aligns to terrain surface normal for slope-aware placement.
+/// Ghost uses Y-axis rotation only (no slope alignment).
 /// </summary>
 public partial class BuildSystem : Node
 {
@@ -97,34 +97,16 @@ public partial class BuildSystem : Node
 	{
 		_ghostPreview = new Node3D { Name = "GhostPreview" };
 
-		var mesh = new MeshInstance3D();
-		mesh.Mesh = structureType switch
+		var mesh = new MeshInstance3D
 		{
-			"wood_wall"  or "stone_wall"  => new BoxMesh { Size = new Vector3(2f, 2.5f, 0.2f) },
-			"wood_floor" or "stone_floor" => new BoxMesh { Size = new Vector3(2f, 0.1f, 2f) },
-			"wood_door"                   => new BoxMesh { Size = new Vector3(1f, 2.2f, 0.15f) },
-			"campfire"                    => new CylinderMesh { TopRadius = 0.3f, BottomRadius = 0.5f, Height = 0.3f },
-			"workbench"                   => new BoxMesh { Size = new Vector3(1.2f, 0.8f, 0.8f) },
-			"chest"                       => new BoxMesh { Size = new Vector3(0.8f, 0.6f, 0.5f) },
-			_                             => new BoxMesh { Size = new Vector3(1f, 1f, 1f) },
+			Mesh             = WorldManager.StructureFallbackMesh(structureType),
+			MaterialOverride = new StandardMaterial3D
+			{
+				AlbedoColor  = new Color(0.3f, 0.8f, 0.3f, 0.4f),
+				Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+			},
 		};
-
-		mesh.MaterialOverride = new StandardMaterial3D
-		{
-			AlbedoColor  = new Color(0.3f, 0.8f, 0.3f, 0.4f),
-			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-		};
-
-		mesh.Position = new Vector3(0, structureType switch
-		{
-			"wood_wall"  or "stone_wall"  => 1.25f,
-			"wood_floor" or "stone_floor" => 0.05f,
-			"wood_door"                   => 1.1f,
-			"campfire"                    => 0.15f,
-			"workbench"                   => 0.4f,
-			"chest"                       => 0.3f,
-			_                             => 0.5f,
-		}, 0);
+		mesh.Position = new Vector3(0, WorldManager.StructureYOffset(structureType), 0);
 
 		_ghostPreview.AddChild(mesh);
 		GetParent().AddChild(_ghostPreview);

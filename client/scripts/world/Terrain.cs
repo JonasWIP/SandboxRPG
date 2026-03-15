@@ -46,8 +46,7 @@ public partial class Terrain : StaticBody3D
         var cfg = gm.GetTerrainConfig();
         if (cfg != null) ApplyConfig(cfg);
 
-        GenerateMesh();
-        GenerateCollision();
+        Regenerate();
     }
 
     private void OnTerrainConfigChanged()
@@ -55,8 +54,25 @@ public partial class Terrain : StaticBody3D
         var cfg = GameManager.Instance.GetTerrainConfig();
         if (cfg == null) return;
         ApplyConfig(cfg);
-        GenerateMesh();
-        GenerateCollision();
+        Regenerate();
+    }
+
+    private void Regenerate()
+    {
+        var heights = ComputeHeights();
+        GenerateMesh(heights);
+        GenerateCollision(heights);
+    }
+
+    private float[] ComputeHeights()
+    {
+        int   n      = Subdivisions + 1;
+        float step   = _worldSize / Subdivisions;
+        var   result = new float[n * n];
+        for (int z = 0; z < n; z++)
+        for (int x = 0; x < n; x++)
+            result[z * n + x] = HeightAt(x * step - _worldSize / 2f, z * step - _worldSize / 2f);
+        return result;
     }
 
     private static void ApplyConfig(SpacetimeDB.Types.TerrainConfig cfg) // cfg is a class, not a struct
@@ -67,32 +83,26 @@ public partial class Terrain : StaticBody3D
         _worldSize  = cfg.WorldSize;
     }
 
-    private void GenerateMesh()
+    private void GenerateMesh(float[] heights)
     {
         var meshInstance = GetNode<MeshInstance3D>("MeshInstance3D");
-        meshInstance.Mesh = BuildArrayMesh();
+        meshInstance.Mesh = BuildArrayMesh(heights);
         if (TerrainMaterial != null)
             meshInstance.SetSurfaceOverrideMaterial(0, TerrainMaterial);
         else
             GD.PrintErr("[Terrain] No TerrainMaterial assigned!");
     }
 
-    private void GenerateCollision()
+    private void GenerateCollision(float[] heights)
     {
-        var shape   = GetNode<CollisionShape3D>("CollisionShape3D");
-        int mapSize = Subdivisions + 1;
-        float step  = _worldSize / Subdivisions;
-        var heights = new float[mapSize * mapSize];
-
-        for (int z = 0; z < mapSize; z++)
-        for (int x = 0; x < mapSize; x++)
-            heights[z * mapSize + x] = HeightAt(x * step - _worldSize / 2f, z * step - _worldSize / 2f);
-
-        shape.Shape = new HeightMapShape3D { MapWidth = mapSize, MapDepth = mapSize, MapData = heights };
-        shape.Scale = new Vector3(step, 1f, step);
+        int   mapSize = Subdivisions + 1;
+        float step    = _worldSize / Subdivisions;
+        var   shape   = GetNode<CollisionShape3D>("CollisionShape3D");
+        shape.Shape   = new HeightMapShape3D { MapWidth = mapSize, MapDepth = mapSize, MapData = heights };
+        shape.Scale   = new Vector3(step, 1f, step);
     }
 
-    private ArrayMesh BuildArrayMesh()
+    private ArrayMesh BuildArrayMesh(float[] heights)
     {
         int   n      = Subdivisions + 1;
         float step   = _worldSize / Subdivisions;
@@ -103,24 +113,25 @@ public partial class Terrain : StaticBody3D
         var uvs       = new List<Vector2>(n * n);
         var indices   = new List<int>(Subdivisions * Subdivisions * 6);
 
-        for (int z = 0; z <= Subdivisions; z++)
-        for (int x = 0; x <= Subdivisions; x++)
+        for (int z = 0; z < n; z++)
+        for (int x = 0; x < n; x++)
         {
             float wx = x * step - _worldSize / 2f;
             float wz = z * step - _worldSize / 2f;
-            float wy = HeightAt(wx, wz);
+            float wy = heights[z * n + x];
+            float dx = x < n - 1 ? heights[z * n + (x + 1)] - wy : 0f;
+            float dz = z < n - 1 ? heights[(z + 1) * n + x] - wy : 0f;
             positions.Add(new Vector3(wx, wy, wz));
             uvs.Add(new Vector2(x * uvStep, z * uvStep));
-            normals.Add(new Vector3(wy - HeightAt(wx + 0.1f, wz), 0.1f, wy - HeightAt(wx, wz + 0.1f)).Normalized());
+            normals.Add(new Vector3(-dx, step, -dz).Normalized());
         }
 
-        int w = Subdivisions + 1;
         for (int z = 0; z < Subdivisions; z++)
         for (int x = 0; x < Subdivisions; x++)
         {
-            int i = z * w + x;
-            indices.Add(i);         indices.Add(i + 1);     indices.Add(i + w + 1);
-            indices.Add(i);         indices.Add(i + w + 1); indices.Add(i + w);
+            int i = z * n + x;
+            indices.Add(i);         indices.Add(i + 1);     indices.Add(i + n + 1);
+            indices.Add(i);         indices.Add(i + n + 1); indices.Add(i + n);
         }
 
         var arrays = new Godot.Collections.Array();

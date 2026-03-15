@@ -226,13 +226,35 @@ public partial class WorldManager : Node3D
 		return mesh;
 	}
 
-	/// <summary>Recursively applies a color tint to all MeshInstance3D nodes in the subtree.</summary>
-	private static void TintMeshes(Node root, Color color)
+	public static Mesh StructureFallbackMesh(string t) => t switch
 	{
-		if (root is MeshInstance3D mi)
-			mi.MaterialOverride = new StandardMaterial3D { AlbedoColor = color, Roughness = 0.85f };
+		"wood_wall" or "stone_wall"   => new BoxMesh { Size = new Vector3(2f, 2.5f, 0.2f) },
+		"wood_floor" or "stone_floor" => new BoxMesh { Size = new Vector3(2f, 0.1f, 2f) },
+		"wood_door"                   => new BoxMesh { Size = new Vector3(1f, 2.2f, 0.15f) },
+		"campfire"                    => new CylinderMesh { TopRadius = 0.3f, BottomRadius = 0.5f, Height = 0.3f },
+		"workbench"                   => new BoxMesh { Size = new Vector3(1.2f, 0.8f, 0.8f) },
+		"chest"                       => new BoxMesh { Size = new Vector3(0.8f, 0.6f, 0.5f) },
+		_                             => new BoxMesh { Size = new Vector3(1f, 1f, 1f) },
+	};
+
+	public static float StructureYOffset(string t) => t switch
+	{
+		"wood_wall" or "stone_wall"   => 1.25f,
+		"wood_floor" or "stone_floor" => 0.05f,
+		"wood_door"                   => 1.1f,
+		"campfire"                    => 0.15f,
+		"workbench"                   => 0.4f,
+		"chest"                       => 0.3f,
+		_                             => 0.5f,
+	};
+
+	/// <summary>Recursively applies a color tint to all MeshInstance3D nodes in the subtree.</summary>
+	private static void TintMeshes(Node root, Color color, StandardMaterial3D? mat = null)
+	{
+		mat ??= new StandardMaterial3D { AlbedoColor = color, Roughness = 0.85f };
+		if (root is MeshInstance3D mi) mi.MaterialOverride = mat;
 		foreach (Node child in root.GetChildren())
-			TintMeshes(child, color);
+			TintMeshes(child, color, mat);
 	}
 
 	// =========================================================================
@@ -296,17 +318,7 @@ public partial class WorldManager : Node3D
 		else
 		{
 			bool isStone = structure.StructureType.Contains("stone");
-			Mesh fallbackMesh = structure.StructureType switch
-			{
-				"wood_wall" or "stone_wall"   => new BoxMesh { Size = new Vector3(2f, 2.5f, 0.2f) },
-				"wood_floor" or "stone_floor" => new BoxMesh { Size = new Vector3(2f, 0.1f, 2f) },
-				"wood_door"                   => new BoxMesh { Size = new Vector3(1f, 2.2f, 0.15f) },
-				"campfire"                    => new CylinderMesh { TopRadius = 0.3f, BottomRadius = 0.5f, Height = 0.3f },
-				"workbench"                   => new BoxMesh { Size = new Vector3(1.2f, 0.8f, 0.8f) },
-				"chest"                       => new BoxMesh { Size = new Vector3(0.8f, 0.6f, 0.5f) },
-				_                             => new BoxMesh { Size = new Vector3(1f, 1f, 1f) },
-			};
-			var mesh = new MeshInstance3D { Mesh = fallbackMesh };
+			var mesh = new MeshInstance3D { Mesh = StructureFallbackMesh(structure.StructureType) };
 			mesh.MaterialOverride = new StandardMaterial3D
 			{
 				AlbedoColor = structure.StructureType switch
@@ -319,17 +331,7 @@ public partial class WorldManager : Node3D
 				},
 				Roughness = 0.85f,
 			};
-			float yOffset = structure.StructureType switch
-			{
-				"wood_wall" or "stone_wall"   => 1.25f,
-				"wood_floor" or "stone_floor" => 0.05f,
-				"wood_door"  => 1.1f,
-				"campfire"   => 0.15f,
-				"workbench"  => 0.4f,
-				"chest"      => 0.3f,
-				_            => 0.5f,
-			};
-			mesh.Position = new Vector3(0, yOffset, 0);
+			mesh.Position = new Vector3(0, StructureYOffset(structure.StructureType), 0);
 			node.AddChild(mesh);
 		}
 

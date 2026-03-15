@@ -5,6 +5,12 @@ namespace SandboxRPG.Server;
 
 public static partial class Module
 {
+    // Terrain defaults — must match the TerrainConfig row inserted in SeedTerrainConfig.
+    private const uint  TerrainSeed      = 42;
+    private const float TerrainNoiseScale = 0.04f;
+    private const float TerrainNoiseAmp   = 1.5f;
+    private const float TerrainWorldSize  = 500f;
+
     // =========================================================================
     // LIFECYCLE REDUCERS
     // Called automatically by SpacetimeDB — not invokable by clients.
@@ -107,28 +113,24 @@ public static partial class Module
         ctx.Db.TerrainConfig.Insert(new TerrainConfig
         {
             Id             = 0,
-            Seed           = 42,
-            WorldSize      = 500f,
-            NoiseScale     = 0.04f,
-            NoiseAmplitude = 1.5f,
+            Seed           = TerrainSeed,
+            WorldSize      = TerrainWorldSize,
+            NoiseScale     = TerrainNoiseScale,
+            NoiseAmplitude = TerrainNoiseAmp,
         });
         Log.Info("Seeded terrain config.");
     }
 
-    /// <summary>Mirrors client Terrain.HeightAt. Seed/noise constants must match TerrainConfig defaults.</summary>
+    /// <summary>Mirrors client Terrain.HeightAt — must stay in sync with module constants.</summary>
     private static float TerrainHeightAt(float x, float z)
     {
-        const uint  Seed  = 42;
-        const float NScl  = 0.04f;
-        const float NAmp  = 1.5f;
-
         if (z < 0f) return (float)Math.Max(z * 0.3, -3.0);
         double t     = Math.Clamp((z - 2.0) / 15.0, 0.0, 1.0);
         double baseH = t * t * (3.0 - 2.0 * t) * 2.0;
         double nr    = Math.Clamp((z - 5.0) / 15.0, 0.0, 1.0);
-        double s     = Seed * 0.001;
-        double noise = Math.Sin(x * NScl + s) * Math.Cos(z * NScl * 1.7 + s * 1.3) * NAmp
-                     + Math.Sin((x + z) * NScl * 2.9 + s * 0.7) * NAmp * 0.3;
+        double s     = TerrainSeed * 0.001;
+        double noise = Math.Sin(x * TerrainNoiseScale + s) * Math.Cos(z * TerrainNoiseScale * 1.7 + s * 1.3) * TerrainNoiseAmp
+                     + Math.Sin((x + z) * TerrainNoiseScale * 2.9 + s * 0.7) * TerrainNoiseAmp * 0.3;
         return (float)(baseH + noise * nr);
     }
 
