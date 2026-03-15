@@ -84,5 +84,352 @@ public static partial class Module
         ctx.Db.SlotSession.Delete(session);
         ctx.Db.SlotSession.Insert(new SlotSession { MachineId = machineId, IsIdle = true });
     }
+
+    // ── Blackjack helpers ─────────────────────────────────────────────────────
+
+    private static int CardValue(string card)
+    {
+        string rank = card[..^1]; // strip suit
+        return rank switch { "A" => 11, "J" or "Q" or "K" => 10, _ => int.Parse(rank) };
+    }
+
+    private static int HandValue(string hand)
+    {
+        if (string.IsNullOrEmpty(hand)) return 0;
+        var cards = hand.Split(',');
+        int total = 0, aces = 0;
+        foreach (var c in cards)
+        {
+            int v = CardValue(c);
+            if (v == 11) aces++;
+            total += v;
+        }
+        while (total > 21 && aces > 0) { total -= 10; aces--; }
+        return total;
+    }
+
+    private static (string card, string remainingDeck) DrawCard(string deck)
+    {
+        var cards = deck.Split(',');
+        return (cards[0], string.Join(",", cards[1..]));
+    }
+
+    private static void CheckAllSeatsResolved(ReducerContext ctx, ulong machineId, uint roundId)
+    {
+        var seats = ctx.Db.BlackjackSeat.Iter()
+            .Where(s => s.MachineId == machineId && s.RoundId == roundId).ToList();
+        bool allDone = seats.All(s => s.State is 2 or 3 or 4); // Standing/Bust/Done
+        if (!allDone) return;
+
+        RunDealerTurn(ctx, machineId, roundId);
+    }
+
+    private static void RunDealerTurn(ReducerContext ctx, ulong machineId, uint roundId)
+    {
+        var gameFound = ctx.Db.BlackjackGame.MachineId.Find(machineId);
+        if (gameFound is null) throw new Exception("Game not found");
+        var g = gameFound.Value;
+        g.State = 2; // DealerTurn
+        string deck = g.Deck;
+
+        while (HandValue(g.DealerHand) < 17)
+        {
+            var (card, remaining) = DrawCard(deck);
+            g.DealerHand = string.IsNullOrEmpty(g.DealerHand) ? card : g.DealerHand + "," + card;
+            deck = remaining;
+        }
+        g.Deck = deck;
+        g.DealerHandHidden = g.DealerHand; // reveal
+
+        int dealerTotal = HandValue(g.DealerHand);
+        var seats = ctx.Db.BlackjackSeat.Iter()
+            .Where(s => s.MachineId == machineId && s.RoundId == roundId).ToList();
+
+        foreach (var seat in seats)
+        {
+            int playerTotal = HandValue(seat.Hand);
+            bool playerBust = playerTotal > 21;
+            bool dealerBust = dealerTotal > 21;
+            ulong payout = 0;
+
+            if (!playerBust)
+            {
+                if (dealerBust || playerTotal > dealerTotal) payout = seat.Bet * 2; // Win
+                else if (playerTotal == dealerTotal) payout = seat.Bet;             // Push
+            }
+            if (payout > 0)
+                CreditCoins(ctx, seat.PlayerId, payout, $"blackjack_win:{machineId}");
+        }
+
+        g.State = 3; // Payout
+        ctx.Db.BlackjackGame.Delete(gameFound.Value);
+        ctx.Db.BlackjackGame.Insert(g);
+    }
+
+    // ── Blackjack reducers ────────────────────────────────────────────────────
+
+    [Reducer]
+    public static void JoinBlackjack(ReducerContext ctx, ulong machineId, byte seatIndex)
+    {
+        if (seatIndex > 3) throw new Exception("Seat index must be 0–3");
+
+        var gameFound = ctx.Db.BlackjackGame.MachineId.Find(machineId);
+        if (gameFound is null) throw new Exception("Blackjack table not found");
+        var game = gameFound.Value;
+
+        // Reset from Payout state
+        if (game.State == 3)
+        {
+            foreach (var old in ctx.Db.BlackjackSeat.Iter()
+                .Where(s => s.MachineId == machineId && s.RoundId == game.RoundId).ToList())
+                ctx.Db.BlackjackSeat.Delete(old);
+            var reset = game;
+            reset.State = 0;
+            ctx.Db.BlackjackGame.Delete(game);
+            ctx.Db.BlackjackGame.Insert(reset);
+            var reloaded = ctx.Db.BlackjackGame.MachineId.Find(machineId);
+            if (reloaded is null) throw new Exception("Table reload failed");
+            game = reloaded.Value;
+        }
+
+        if (game.State != 0) throw new Exception("Round already in progress");
+
+        bool taken = ctx.Db.BlackjackSeat.Iter().Any(s =>
+            s.MachineId == machineId && s.SeatIndex == seatIndex && s.RoundId == game.RoundId);
+        if (taken) throw new Exception("Seat already taken");
+
+        bool alreadySitting = ctx.Db.BlackjackSeat.Iter().Any(s =>
+            s.MachineId == machineId && s.PlayerId == ctx.Sender && s.RoundId == game.RoundId);
+        if (alreadySitting) throw new Exception("Already seated");
+
+        ctx.Db.BlackjackSeat.Insert(new BlackjackSeat
+        {
+            MachineId = machineId, SeatIndex = seatIndex,
+            PlayerId = ctx.Sender, Hand = "", Bet = 0, State = 0,
+            RoundId = game.RoundId
+        });
+    }
+
+    [Reducer]
+    public static void PlaceBet(ReducerContext ctx, ulong machineId, ulong amount)
+    {
+        if (amount == 0) throw new Exception("Bet must be > 0");
+        var gameFound = ctx.Db.BlackjackGame.MachineId.Find(machineId);
+        if (gameFound is null) throw new Exception("Table not found");
+        var game = gameFound.Value;
+        if (game.State != 0) throw new Exception("Betting closed");
+
+        var seat = ctx.Db.BlackjackSeat.Iter()
+            .FirstOrDefault(s => s.MachineId == machineId && s.PlayerId == ctx.Sender
+                              && s.RoundId == game.RoundId);
+        if (seat.PlayerId != ctx.Sender) throw new Exception("Not seated");
+        if (seat.Bet > 0) throw new Exception("Bet already placed");
+
+        DebitCoins(ctx, ctx.Sender, amount, $"blackjack_bet:{machineId}");
+        ctx.Db.BlackjackSeat.Delete(seat);
+        ctx.Db.BlackjackSeat.Insert(new BlackjackSeat
+        {
+            Id = seat.Id, MachineId = seat.MachineId, SeatIndex = seat.SeatIndex,
+            PlayerId = seat.PlayerId, Hand = seat.Hand, Bet = amount,
+            State = seat.State, RoundId = seat.RoundId
+        });
+    }
+
+    [Reducer]
+    public static void StartBlackjackRound(ReducerContext ctx, ulong machineId)
+    {
+        var gameFound = ctx.Db.BlackjackGame.MachineId.Find(machineId);
+        if (gameFound is null) throw new Exception("Table not found");
+        var game = gameFound.Value;
+        if (game.State != 0 && game.State != 3)
+            throw new Exception("Round already started");
+
+        if (game.State == 3)
+        {
+            foreach (var old in ctx.Db.BlackjackSeat.Iter()
+                .Where(s => s.MachineId == machineId).ToList())
+                ctx.Db.BlackjackSeat.Delete(old);
+        }
+
+        var seatsWithBets = ctx.Db.BlackjackSeat.Iter()
+            .Where(s => s.MachineId == machineId && s.Bet > 0).ToList();
+        if (seatsWithBets.Count == 0) throw new Exception("No players with bets");
+
+        uint newRoundId = game.RoundId + 1;
+        string deck = BuildDeck();
+
+        // Deal 2 cards to each player
+        foreach (var seat in seatsWithBets)
+        {
+            string hand = "";
+            for (int i = 0; i < 2; i++)
+            {
+                var (card, remaining) = DrawCard(deck);
+                deck = remaining;
+                hand = string.IsNullOrEmpty(hand) ? card : hand + "," + card;
+            }
+            ctx.Db.BlackjackSeat.Delete(seat);
+            ctx.Db.BlackjackSeat.Insert(new BlackjackSeat
+            {
+                Id = seat.Id, MachineId = seat.MachineId, SeatIndex = seat.SeatIndex,
+                PlayerId = seat.PlayerId, Hand = hand, Bet = seat.Bet,
+                State = 0, // will be set below
+                RoundId = newRoundId
+            });
+        }
+
+        // Deal 2 to dealer
+        string dealerHand = "";
+        for (int i = 0; i < 2; i++)
+        {
+            var (card, remaining) = DrawCard(deck);
+            deck = remaining;
+            dealerHand = string.IsNullOrEmpty(dealerHand) ? card : dealerHand + "," + card;
+        }
+
+        // Set first seat to Acting, rest to Waiting
+        bool firstSet = false;
+        var allSeats = ctx.Db.BlackjackSeat.Iter()
+            .Where(s => s.MachineId == machineId && s.RoundId == newRoundId)
+            .OrderBy(s => s.SeatIndex).ToList();
+        foreach (var s in allSeats)
+        {
+            byte state = !firstSet ? (byte)1 : (byte)0; // 1=Acting, 0=Waiting
+            if (!firstSet) firstSet = true;
+            ctx.Db.BlackjackSeat.Delete(s);
+            ctx.Db.BlackjackSeat.Insert(new BlackjackSeat
+            {
+                Id = s.Id, MachineId = s.MachineId, SeatIndex = s.SeatIndex,
+                PlayerId = s.PlayerId, Hand = s.Hand, Bet = s.Bet,
+                State = state, RoundId = newRoundId
+            });
+        }
+
+        string hiddenDealer = dealerHand.Split(',')[0] + ",??";
+        ctx.Db.BlackjackGame.Delete(game);
+        ctx.Db.BlackjackGame.Insert(new BlackjackGame
+        {
+            MachineId = machineId, State = 1,
+            DealerHand = dealerHand, DealerHandHidden = hiddenDealer,
+            Deck = deck, RoundId = newRoundId
+        });
+    }
+
+    [Reducer]
+    public static void HitBlackjack(ReducerContext ctx, ulong machineId)
+    {
+        var gameFound = ctx.Db.BlackjackGame.MachineId.Find(machineId);
+        if (gameFound is null) throw new Exception("Table not found");
+        var game = gameFound.Value;
+        if (game.State != 1) throw new Exception("Not in player turns");
+
+        var seat = ctx.Db.BlackjackSeat.Iter()
+            .FirstOrDefault(s => s.MachineId == machineId && s.PlayerId == ctx.Sender
+                              && s.RoundId == game.RoundId && s.State == 1);
+        if (seat.PlayerId != ctx.Sender) throw new Exception("Not your turn");
+
+        var (card, deck) = DrawCard(game.Deck);
+        string newHand = seat.Hand + "," + card;
+        byte newState = HandValue(newHand) > 21 ? (byte)3 : (byte)1; // Bust or still Acting
+
+        ctx.Db.BlackjackSeat.Delete(seat);
+        ctx.Db.BlackjackSeat.Insert(new BlackjackSeat
+        {
+            Id = seat.Id, MachineId = seat.MachineId, SeatIndex = seat.SeatIndex,
+            PlayerId = seat.PlayerId, Hand = newHand, Bet = seat.Bet,
+            State = newState, RoundId = seat.RoundId
+        });
+        var g = game; g.Deck = deck;
+        ctx.Db.BlackjackGame.Delete(game);
+        ctx.Db.BlackjackGame.Insert(g);
+
+        if (newState == 3) AdvanceToNextSeat(ctx, machineId, game.RoundId);
+    }
+
+    [Reducer]
+    public static void StandBlackjack(ReducerContext ctx, ulong machineId)
+    {
+        var gameFound = ctx.Db.BlackjackGame.MachineId.Find(machineId);
+        if (gameFound is null) throw new Exception("Table not found");
+        var game = gameFound.Value;
+        if (game.State != 1) throw new Exception("Not in player turns");
+
+        var seat = ctx.Db.BlackjackSeat.Iter()
+            .FirstOrDefault(s => s.MachineId == machineId && s.PlayerId == ctx.Sender
+                              && s.RoundId == game.RoundId && s.State == 1);
+        if (seat.PlayerId != ctx.Sender) throw new Exception("Not your turn");
+
+        ctx.Db.BlackjackSeat.Delete(seat);
+        ctx.Db.BlackjackSeat.Insert(new BlackjackSeat
+        {
+            Id = seat.Id, MachineId = seat.MachineId, SeatIndex = seat.SeatIndex,
+            PlayerId = seat.PlayerId, Hand = seat.Hand, Bet = seat.Bet,
+            State = 2, RoundId = seat.RoundId // Standing
+        });
+        AdvanceToNextSeat(ctx, machineId, game.RoundId);
+    }
+
+    private static void AdvanceToNextSeat(ReducerContext ctx, ulong machineId, uint roundId)
+    {
+        var next = ctx.Db.BlackjackSeat.Iter()
+            .Where(s => s.MachineId == machineId && s.RoundId == roundId && s.State == 0)
+            .OrderBy(s => s.SeatIndex).FirstOrDefault();
+
+        if (next.RoundId == roundId) // found a waiting seat
+        {
+            ctx.Db.BlackjackSeat.Delete(next);
+            ctx.Db.BlackjackSeat.Insert(new BlackjackSeat
+            {
+                Id = next.Id, MachineId = next.MachineId, SeatIndex = next.SeatIndex,
+                PlayerId = next.PlayerId, Hand = next.Hand, Bet = next.Bet,
+                State = 1, RoundId = next.RoundId // Acting
+            });
+        }
+        else
+        {
+            CheckAllSeatsResolved(ctx, machineId, roundId);
+        }
+    }
+
+    [Reducer]
+    public static void LeaveBlackjack(ReducerContext ctx, ulong machineId)
+    {
+        var gameFound = ctx.Db.BlackjackGame.MachineId.Find(machineId);
+        var seat = ctx.Db.BlackjackSeat.Iter()
+            .FirstOrDefault(s => s.MachineId == machineId && s.PlayerId == ctx.Sender);
+        if (seat.PlayerId != ctx.Sender) return;
+
+        if (gameFound is not null && gameFound.Value.State == 0 && seat.Bet > 0)
+            CreditCoins(ctx, ctx.Sender, seat.Bet, "blackjack_leave_refund");
+
+        ctx.Db.BlackjackSeat.Delete(seat);
+    }
+
+    [Reducer]
+    public static void SkipSeat(ReducerContext ctx, ulong machineId, byte seatIndex)
+    {
+        var gameFound = ctx.Db.BlackjackGame.MachineId.Find(machineId);
+        if (gameFound is null) throw new Exception("Table not found");
+        var game = gameFound.Value;
+        if (game.State != 1) throw new Exception("Not in player turns");
+
+        var seat = ctx.Db.BlackjackSeat.Iter()
+            .FirstOrDefault(s => s.MachineId == machineId && s.SeatIndex == seatIndex
+                              && s.RoundId == game.RoundId && s.State == 1);
+        if (seat.RoundId != game.RoundId) throw new Exception("Seat not found or not active");
+
+        var target = ctx.Db.Player.Identity.Find(seat.PlayerId);
+        if (target != null && target.Value.IsOnline)
+            throw new Exception("Player is still connected");
+
+        ctx.Db.BlackjackSeat.Delete(seat);
+        ctx.Db.BlackjackSeat.Insert(new BlackjackSeat
+        {
+            Id = seat.Id, MachineId = seat.MachineId, SeatIndex = seat.SeatIndex,
+            PlayerId = seat.PlayerId, Hand = seat.Hand, Bet = seat.Bet,
+            State = 2, RoundId = seat.RoundId
+        });
+        AdvanceToNextSeat(ctx, machineId, game.RoundId);
+    }
 }
 #endif
