@@ -63,7 +63,7 @@ Supporting changes in `WorldManager.cs`:
 In `BuildSystem.CreateGhostPreview`:
 1. Call `WorldManager.StructureModelPath(structureType)` — if a path exists and the resource loads, instantiate the GLB as the ghost node
 2. Apply transparent green material recursively to all `MeshInstance3D` children of the instantiated model
-3. Apply `StructureYOffset` as a child position offset (same as current fallback behavior)
+3. Do NOT apply `StructureYOffset` to the instantiated GLB child node — `CreateStructureVisual`'s model branch also applies no Y offset to the GLB child, so this keeps ghost and placed structure in sync
 4. If no model path exists, fall back to the current `MeshInstance3D` with `StructureFallbackMesh`
 
 **Effect:** Ghost shows the real model shape and default orientation, so rotating the ghost with R exactly predicts how the placed structure will appear.
