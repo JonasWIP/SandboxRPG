@@ -13,7 +13,7 @@ public partial class WorldManager : Node3D
 	// === Tracked entities ===
 	private readonly Dictionary<string, RemotePlayer> _remotePlayers = new();
 	private readonly Dictionary<ulong, Node3D> _worldItems = new();
-	private readonly Dictionary<ulong, Node3D> _structures = new();
+	private readonly Dictionary<ulong, StaticBody3D> _structures = new();
 	private readonly Dictionary<ulong, Node3D> _worldObjects = new();
 
 	private PlayerController? _localPlayer;
@@ -302,25 +302,16 @@ public partial class WorldManager : Node3D
 			_structures.Remove(id);
 	}
 
-	private Node3D CreateStructureVisual(PlacedStructure structure)
+	private StaticBody3D CreateStructureVisual(PlacedStructure structure)
 	{
-		var node = new Node3D { Name = $"Structure_{structure.Id}" };
+		var body = new StaticBody3D { Name = $"Structure_{structure.Id}" };
 
-		string? modelPath = structure.StructureType switch
-		{
-			"wood_wall"   or "stone_wall"  => "res://assets/models/building/wall.glb",
-			"wood_floor"  or "stone_floor" => "res://assets/models/building/floor.glb",
-			"wood_door"                    => "res://assets/models/building/wall-doorway-square.glb",
-			"campfire"                     => "res://assets/models/survival/campfire-pit.glb",
-			"workbench"                    => "res://assets/models/survival/workbench.glb",
-			"chest"                        => "res://assets/models/survival/chest.glb",
-			_                              => null,
-		};
+		string? modelPath = StructureModelPath(structure.StructureType);
 
 		if (modelPath != null && ResourceLoader.Exists(modelPath))
 		{
-			var scene   = ResourceLoader.Load<PackedScene>(modelPath);
-			var visual  = scene.Instantiate<Node3D>();
+			var scene  = ResourceLoader.Load<PackedScene>(modelPath);
+			var visual = scene.Instantiate<Node3D>();
 			Color? tint = structure.StructureType switch
 			{
 				"wood_wall" or "wood_floor" or "wood_door" => new Color(0.65f, 0.45f, 0.25f),
@@ -328,7 +319,7 @@ public partial class WorldManager : Node3D
 				_                                           => (Color?)null,
 			};
 			if (tint.HasValue) TintMeshes(visual, tint.Value);
-			node.AddChild(visual);
+			body.AddChild(visual);
 		}
 		else
 		{
@@ -338,25 +329,41 @@ public partial class WorldManager : Node3D
 			{
 				AlbedoColor = structure.StructureType switch
 				{
-					"campfire"  => new Color(0.8f, 0.3f, 0.1f),
-					"workbench" => new Color(0.5f, 0.35f, 0.2f),
-					"chest"     => new Color(0.55f, 0.4f, 0.25f),
+					"campfire"     => new Color(0.8f, 0.3f,  0.1f),
+					"workbench"    => new Color(0.5f, 0.35f, 0.2f),
+					"chest"        => new Color(0.55f, 0.4f, 0.25f),
 					_ when isStone => new Color(0.55f, 0.55f, 0.6f),
-					_           => new Color(0.6f, 0.45f, 0.25f),
+					_              => new Color(0.6f, 0.45f, 0.25f),
 				},
 				Roughness = 0.85f,
 			};
 			mesh.Position = new Vector3(0, StructureYOffset(structure.StructureType), 0);
-			node.AddChild(mesh);
+			body.AddChild(mesh);
 		}
 
-		node.Position = new Vector3(structure.PosX, structure.PosY, structure.PosZ);
-		node.Rotation = new Vector3(0, structure.RotY, 0);
-		node.SetMeta("structure_id", (long)structure.Id);
-		node.SetMeta("structure_type", structure.StructureType);
-		node.SetMeta("owner_id", structure.OwnerId.ToString());
+		var (shapeSize, shapeCenter) = structure.StructureType switch
+		{
+			"wood_wall"   or "stone_wall"  => (new Vector3(2.5f, 2.5f, 0.25f), new Vector3(0, 1.25f, 0)),
+			"wood_floor"  or "stone_floor" => (new Vector3(2.5f, 0.1f,  2.5f),  new Vector3(0, 0.05f, 0)),
+			"wood_door"                    => (new Vector3(2.5f, 2.5f, 0.25f), new Vector3(0, 1.25f, 0)),
+			"campfire"                     => (new Vector3(0.8f, 0.4f,  0.8f),  new Vector3(0, 0.2f,  0)),
+			"workbench"                    => (new Vector3(1.2f, 0.8f,  0.6f),  new Vector3(0, 0.4f,  0)),
+			"chest"                        => (new Vector3(0.8f, 0.6f,  0.6f),  new Vector3(0, 0.3f,  0)),
+			_                              => (new Vector3(1.0f, 1.0f,  1.0f),  new Vector3(0, 0.5f,  0)),
+		};
+		body.AddChild(new CollisionShape3D
+		{
+			Shape    = new BoxShape3D { Size = shapeSize },
+			Position = shapeCenter,
+		});
 
-		return node;
+		body.Position = new Vector3(structure.PosX, structure.PosY, structure.PosZ);
+		body.Rotation = new Vector3(0, structure.RotY, 0);
+		body.SetMeta("structure_id",  (long)structure.Id);
+		body.SetMeta("structure_type", structure.StructureType);
+		body.SetMeta("owner_id",       structure.OwnerId.ToString());
+
+		return body;
 	}
 
 	// =========================================================================
