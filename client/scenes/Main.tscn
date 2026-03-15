@@ -1,31 +1,41 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://scripts/world/WorldManager.cs" id="1_world"]
 [ext_resource type="Script" path="res://scripts/world/InteractionSystem.cs" id="2_interact"]
 [ext_resource type="Script" path="res://scripts/building/BuildSystem.cs" id="3_build"]
 [ext_resource type="Script" path="res://scripts/ui/ChatUI.cs" id="4_chat"]
 [ext_resource type="Script" path="res://scripts/ui/HUD.cs" id="5_hud"]
+[ext_resource type="Script" path="res://scripts/world/Terrain.cs" id="6_terrain"]
+[ext_resource type="Shader" path="res://assets/shaders/terrain_blend.gdshader" id="7_shader"]
+[ext_resource type="Texture2D" path="res://assets/textures/sand.png" id="8_sand"]
+[ext_resource type="Texture2D" path="res://assets/textures/grass.png" id="9_grass"]
 
-[sub_resource type="PlaneMesh" id="PlaneMesh_ground"]
-size = Vector2(100, 100)
+[sub_resource type="ShaderMaterial" id="ShaderMat_terrain"]
+shader = ExtResource("7_shader")
+shader_parameter/blend_height = 0.5
+shader_parameter/blend_sharpness = 3.0
+shader_parameter/uv_scale = Vector2(8, 8)
+shader_parameter/sand_texture = ExtResource("8_sand")
+shader_parameter/grass_texture = ExtResource("9_grass")
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_ground"]
-size = Vector3(100, 0.1, 100)
+[sub_resource type="PlaneMesh" id="PlaneMesh_ocean"]
+size = Vector2(80, 100)
 
-[sub_resource type="StandardMaterial3D" id="Material_ground"]
-albedo_color = Color(0.35, 0.55, 0.3, 1)
-roughness = 0.95
+[sub_resource type="StandardMaterial3D" id="Material_ocean"]
+transparency = 1
+albedo_color = Color(0.2, 0.5, 0.7, 0.75)
+roughness = 0.1
 
 [sub_resource type="Environment" id="Environment_world"]
 background_mode = 2
-background_color = Color(0.45, 0.65, 0.85, 1)
+background_color = Color(0.5, 0.75, 0.95, 1)
 ambient_light_source = 2
 ambient_light_color = Color(0.7, 0.75, 0.85, 1)
 ambient_light_energy = 0.4
 tonemap_mode = 2
 fog_enabled = true
-fog_light_color = Color(0.6, 0.7, 0.85, 1)
-fog_density = 0.002
+fog_light_color = Color(0.7, 0.85, 0.9, 1)
+fog_density = 0.003
 fog_sky_affect = 0.5
 
 [node name="Main" type="Node3D"]
@@ -39,15 +49,18 @@ light_color = Color(1, 0.95, 0.85, 1)
 light_energy = 1.2
 shadow_enabled = true
 
-[node name="Ground" type="StaticBody3D" parent="."]
+[node name="Terrain" type="StaticBody3D" parent="."]
+script = ExtResource("6_terrain")
 
-[node name="GroundMesh" type="MeshInstance3D" parent="Ground"]
-mesh = SubResource("PlaneMesh_ground")
-surface_material_override/0 = SubResource("Material_ground")
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Terrain"]
+surface_material_override/0 = SubResource("ShaderMat_terrain")
 
-[node name="GroundCollision" type="CollisionShape3D" parent="Ground"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
-shape = SubResource("BoxShape3D_ground")
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Terrain"]
+
+[node name="Ocean" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2, 20)
+mesh = SubResource("PlaneMesh_ocean")
+surface_material_override/0 = SubResource("Material_ocean")
 
 [node name="WorldManager" type="Node3D" parent="."]
 script = ExtResource("1_world")
