@@ -40,7 +40,7 @@ public partial class BuildSystem : Node
 		}
 
 		var activeItem = Hotbar.Instance?.ActiveItemType;
-		bool isBuildable = activeItem != null && BuildableTypes.Contains(activeItem);
+		bool isBuildable = IsBuildable(activeItem);
 
 		if (!isBuildable)
 		{

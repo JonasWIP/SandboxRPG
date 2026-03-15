@@ -6,7 +6,7 @@ namespace SandboxRPG;
 /// <summary>
 /// Handles player interactions:
 /// - Proximity detection for nearby WorldItems (pickup with E)
-/// - Raycast detection for WorldObjects like trees and rocks (harvest with E)
+/// - Raycast detection for WorldObjects like trees and rocks (harvest with LMB)
 /// </summary>
 public partial class InteractionSystem : Node
 {
