@@ -5,7 +5,8 @@ namespace SandboxRPG;
 /// <summary>
 /// Building system — no separate build mode toggle.
 /// Building is active automatically when the selected hotbar slot holds a
-/// placeable structure item.  Left-click places, R rotates the ghost.
+/// placeable structure item.  Left-click places, R rotates the ghost 90° steps.
+/// Ghost aligns to terrain surface normal for slope-aware placement.
 /// </summary>
 public partial class BuildSystem : Node
 {
@@ -18,9 +19,11 @@ public partial class BuildSystem : Node
 		"wood_door", "campfire", "workbench", "chest",
 	};
 
-	private Node3D?  _ghostPreview;
+	private Node3D?   _ghostPreview;
 	private Camera3D? _camera;
-	private string?   _currentGhostType; // item type the ghost was built for
+	private string?   _currentGhostType;
+	private float _ghostRotationY = 0f;  // accumulated rotation in degrees (90° steps)
+	private bool  _rWasPressed    = false;
 
 	public override void _Process(double delta)
 	{
@@ -46,14 +49,16 @@ public partial class BuildSystem : Node
 		if (activeItem != _currentGhostType)
 		{
 			ClearGhost();
+			_ghostRotationY = 0f;
 			_currentGhostType = activeItem;
 		}
 
 		UpdateGhostPosition();
 
-		// Rotate ghost with R
-		if (Input.IsKeyPressed(Key.R) && _ghostPreview != null)
-			_ghostPreview.RotateY(Mathf.Pi / 2 * (float)delta * 3);
+		// Discrete 90° step on R press
+		if (Input.IsKeyPressed(Key.R) && !_rWasPressed)
+			_ghostRotationY = (_ghostRotationY + 90f) % 360f;
+		_rWasPressed = Input.IsKeyPressed(Key.R);
 
 		// Place on left-click
 		if (Input.IsMouseButtonPressed(MouseButton.Left) && _ghostPreview != null)
@@ -68,24 +73,42 @@ public partial class BuildSystem : Node
 	{
 		if (_camera == null) return;
 
+		var spaceState = _camera.GetWorld3D()?.DirectSpaceState;
+		if (spaceState == null) return;
+
 		var screenCenter = GetViewport().GetVisibleRect().Size / 2;
-		var from      = _camera.ProjectRayOrigin(screenCenter);
-		var direction = _camera.ProjectRayNormal(screenCenter);
+		var from = _camera.ProjectRayOrigin(screenCenter);
+		var dir  = _camera.ProjectRayNormal(screenCenter);
 
-		if (direction.Y == 0) return;
+		var query = PhysicsRayQueryParameters3D.Create(from, from + dir * PlaceRange);
+		var result = spaceState.IntersectRay(query);
+		if (result.Count == 0) return;
 
-		float t = -from.Y / direction.Y;
-		if (t <= 0 || t >= PlaceRange) return;
+		var hitPos = (Vector3)result["position"];
+		var normal = (Vector3)result["normal"];
 
-		var hit = from + direction * t;
-		float snappedX = Mathf.Round(hit.X / GridSize) * GridSize;
-		float snappedZ = Mathf.Round(hit.Z / GridSize) * GridSize;
+		// Grid snap X/Z; Y from terrain surface hit
+		hitPos.X = Mathf.Round(hitPos.X / GridSize) * GridSize;
+		hitPos.Z = Mathf.Round(hitPos.Z / GridSize) * GridSize;
 
 		if (_ghostPreview == null)
 			CreateGhostPreview(_currentGhostType!);
 
-		if (_ghostPreview != null)
-			_ghostPreview.GlobalPosition = new Vector3(snappedX, 0, snappedZ);
+		if (_ghostPreview == null) return;
+
+		// Align ghost up-axis to terrain normal, then apply player Y rotation on top.
+		// Use Vector3.Right as fallback when normal is parallel to Vector3.Forward
+		// (avoids zero cross-product on vertical surfaces).
+		var up    = normal.Normalized();
+		var right = up.Cross(Vector3.Forward);
+		if (right.LengthSquared() < 0.001f)
+			right = up.Cross(Vector3.Right);
+		right = right.Normalized();
+		var forward      = right.Cross(up).Normalized();
+		var surfaceBasis = new Basis(right, up, -forward);
+		var yRotBasis    = Basis.FromEuler(new Vector3(0, Mathf.DegToRad(_ghostRotationY), 0));
+
+		_ghostPreview.GlobalTransform = new Transform3D(surfaceBasis * yRotBasis, hitPos);
 	}
 
 	private void CreateGhostPreview(string structureType)
@@ -142,7 +165,7 @@ public partial class BuildSystem : Node
 		if (_ghostPreview == null || _currentGhostType == null) return;
 
 		var pos  = _ghostPreview.GlobalPosition;
-		var rotY = _ghostPreview.Rotation.Y;
+		var rotY = Mathf.DegToRad(_ghostRotationY);
 		GameManager.Instance.PlaceBuildStructure(_currentGhostType, pos.X, pos.Y, pos.Z, rotY);
 	}
 }
