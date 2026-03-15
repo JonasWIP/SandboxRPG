@@ -162,8 +162,12 @@ public partial class WorldManager : Node3D
 	{
 		var body = new RigidBody3D
 		{
-			Name       = $"WorldItem_{item.Id}",
-			LinearDamp = 2.0f,
+			Name             = $"WorldItem_{item.Id}",
+			LinearDamp       = 2.0f,
+			AngularDamp      = 10f,
+			AxisLockAngularX = true,
+			AxisLockAngularY = true,
+			AxisLockAngularZ = true,
 		};
 
 		// Collision so it lands on terrain
