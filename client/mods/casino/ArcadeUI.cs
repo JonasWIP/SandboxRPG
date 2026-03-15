@@ -69,11 +69,7 @@ public partial class ArcadeUI : Node
     private void ApplyScreenTexture()
     {
         var parent = GetParent<Node3D>();
-        if (parent == null) return;
-        var screen = parent.FindChild("Screen") as MeshInstance3D;
-        if (screen == null) return;
-        var mat = new StandardMaterial3D { AlbedoTexture = _viewport.GetTexture() };
-        screen.MaterialOverride = mat;
+        if (parent != null) CasinoUI.ApplyScreenTexture(parent, _viewport);
     }
 
     private void OnSessionUpdate(SpacetimeDB.Types.EventContext ctx, ArcadeSession old, ArcadeSession newVal)
@@ -120,13 +116,14 @@ public partial class ArcadeUI : Node
 
         double elapsed = 0;
         double total = targetMs / 1000.0;
-        while (elapsed < total + 1.0)
+        while (elapsed < total + 1.0 && IsInsideTree())
         {
             float angle = Mathf.Lerp(-70f, 70f, (float)(elapsed / total));
             needle.Rotation = Mathf.DegToRad(angle);
             await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
             elapsed += GetProcessDeltaTime();
         }
+        if (!IsInsideTree()) return;
         needle.QueueFree();
         _feedbackLabel.Text = "Too late!";
     }
@@ -151,14 +148,17 @@ public partial class ArcadeUI : Node
 
         for (int i = 0; i < challenge.Length; i++)
         {
+            if (!IsInsideTree()) return;
             char c = challenge[i];
             _feedbackLabel.Text = $"Remember: {c}";
             var flash = new ColorRect { Color = colorMap[c], Size = new Vector2(256, 200), Position = new Vector2(0, 50) };
             _viewport.AddChild(flash);
             await ToSignal(GetTree().CreateTimer(0.5), SceneTreeTimer.SignalName.Timeout);
+            if (!IsInsideTree()) return;
             flash.QueueFree();
             await ToSignal(GetTree().CreateTimer(0.2), SceneTreeTimer.SignalName.Timeout);
         }
+        if (!IsInsideTree()) return;
         _feedbackLabel.Text = "Your turn! (R/G/B/Y keys)";
     }
 

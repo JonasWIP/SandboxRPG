@@ -62,11 +62,7 @@ public partial class SlotMachineUI : Node
     private void ApplyScreenTexture()
     {
         var parent = GetParent<Node3D>();
-        if (parent == null) return;
-        var screenMesh = parent.FindChild("Screen") as MeshInstance3D;
-        if (screenMesh == null) return;
-        var mat = new StandardMaterial3D { AlbedoTexture = _viewport.GetTexture() };
-        screenMesh.MaterialOverride = mat;
+        if (parent != null) CasinoUI.ApplyScreenTexture(parent, _viewport);
     }
 
     private void OnSessionUpdate(SpacetimeDB.Types.EventContext ctx, SlotSession oldVal, SlotSession newVal)

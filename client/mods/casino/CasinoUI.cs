@@ -19,5 +19,16 @@ public static class CasinoUI
         InteractionSystem.RegisterStructureHandler("casino_exchange",        id => ExchangeUI.Open(id));
 #endif
     }
+
+    /// <summary>
+    /// Finds a "Screen" MeshInstance3D child of <paramref name="machineNode"/> and applies
+    /// <paramref name="viewport"/>'s texture to it. Shared by SlotMachineUI and ArcadeUI.
+    /// </summary>
+    public static void ApplyScreenTexture(Node3D machineNode, SubViewport viewport)
+    {
+        var screen = machineNode.FindChild("Screen") as MeshInstance3D;
+        if (screen == null) return;
+        screen.MaterialOverride = new StandardMaterial3D { AlbedoTexture = viewport.GetTexture() };
+    }
 }
 #endif

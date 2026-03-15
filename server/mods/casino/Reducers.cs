@@ -121,10 +121,10 @@ public static partial class Module
         bool allDone = seats.All(s => s.State is 2 or 3 or 4); // Standing/Bust/Done
         if (!allDone) return;
 
-        RunDealerTurn(ctx, machineId, roundId);
+        RunDealerTurn(ctx, machineId, seats);
     }
 
-    private static void RunDealerTurn(ReducerContext ctx, ulong machineId, uint roundId)
+    private static void RunDealerTurn(ReducerContext ctx, ulong machineId, List<BlackjackSeat> seats)
     {
         var gameFound = ctx.Db.BlackjackGame.MachineId.Find(machineId);
         if (gameFound is null) throw new Exception("Game not found");
@@ -142,8 +142,6 @@ public static partial class Module
         g.DealerHandHidden = g.DealerHand; // reveal
 
         int dealerTotal = HandValue(g.DealerHand);
-        var seats = ctx.Db.BlackjackSeat.Iter()
-            .Where(s => s.MachineId == machineId && s.RoundId == roundId).ToList();
 
         foreach (var seat in seats)
         {
@@ -194,12 +192,14 @@ public static partial class Module
 
         if (game.State != 0) throw new Exception("Round already in progress");
 
-        bool taken = ctx.Db.BlackjackSeat.Iter().Any(s =>
-            s.MachineId == machineId && s.SeatIndex == seatIndex && s.RoundId == game.RoundId);
+        bool taken = false, alreadySitting = false;
+        foreach (var s in ctx.Db.BlackjackSeat.Iter()
+            .Where(s => s.MachineId == machineId && s.RoundId == game.RoundId))
+        {
+            if (s.SeatIndex == seatIndex) taken = true;
+            if (s.PlayerId == ctx.Sender) alreadySitting = true;
+        }
         if (taken) throw new Exception("Seat already taken");
-
-        bool alreadySitting = ctx.Db.BlackjackSeat.Iter().Any(s =>
-            s.MachineId == machineId && s.PlayerId == ctx.Sender && s.RoundId == game.RoundId);
         if (alreadySitting) throw new Exception("Already seated");
 
         ctx.Db.BlackjackSeat.Insert(new BlackjackSeat

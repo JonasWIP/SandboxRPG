@@ -20,9 +20,16 @@ public partial class CurrencyHUD : Control
         AddChild(_label);
 
         GameManager.Instance.SubscriptionApplied += Refresh;
-        // Subscribe to CurrencyBalance table changes
-        GameManager.Instance.Conn.Db.CurrencyBalance.OnInsert += (_, _) => CallDeferred("Refresh");
-        GameManager.Instance.Conn.Db.CurrencyBalance.OnUpdate += (_, _, _) => CallDeferred("Refresh");
+        GameManager.Instance.Conn.Db.CurrencyBalance.OnInsert += (_, row) =>
+        {
+            var p = GameManager.Instance.GetLocalPlayer();
+            if (p != null && row.PlayerId == p.Identity) CallDeferred("Refresh");
+        };
+        GameManager.Instance.Conn.Db.CurrencyBalance.OnUpdate += (_, _, row) =>
+        {
+            var p = GameManager.Instance.GetLocalPlayer();
+            if (p != null && row.PlayerId == p.Identity) CallDeferred("Refresh");
+        };
     }
 
     public void Refresh()

@@ -1,7 +1,9 @@
 #if MOD_CASINO
 using Godot;
 using SandboxRPG;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using SpacetimeDB.Types;
 
 /// <summary>
@@ -13,8 +15,9 @@ public partial class CoinPusherUI : Node3D
 {
     private static readonly Dictionary<ulong, CoinPusherUI> _instances = new();
 
+    private const uint MaxVisualCoins = 200;
+
     private ulong _machineId;
-    private uint _spawnedCount;
     private CanvasLayer? _popup;
     private static readonly Vector3 PushEntry = new(0f, 1.2f, 0f);
 
@@ -53,23 +56,23 @@ public partial class CoinPusherUI : Node3D
     {
         if (newState.CoinCount > old.CoinCount)
         {
-            // Spawn one new coin per push
-            SpawnCoin(PushEntry + new Vector3(0, 0.2f, 0), applyImpulse: true);
-            _spawnedCount++;
+            // Spawn one new coin per push (only if under visual cap)
+            if (GetChildren().Count(c => c is RigidBody3D) < MaxVisualCoins)
+                SpawnCoin(PushEntry + new Vector3(0, 0.2f, 0), applyImpulse: true);
         }
         else if (newState.CoinCount == 0 && old.CoinCount > 0)
         {
             // Jackpot reset — clear all coin nodes
             foreach (var child in GetChildren())
                 if (child is RigidBody3D) child.QueueFree();
-            _spawnedCount = 0;
         }
     }
 
     private void ScatterCoins(uint count)
     {
         var rng = new System.Random((int)_machineId); // deterministic per machine
-        for (uint i = 0; i < count; i++)
+        uint toSpawn = Math.Min(count, MaxVisualCoins);
+        for (uint i = 0; i < toSpawn; i++)
         {
             var pos = new Vector3(
                 (float)(rng.NextDouble() * 0.8 - 0.4),
@@ -78,7 +81,6 @@ public partial class CoinPusherUI : Node3D
             );
             SpawnCoin(pos, applyImpulse: false);
         }
-        _spawnedCount = count;
     }
 
     private void SpawnCoin(Vector3 localPos, bool applyImpulse)

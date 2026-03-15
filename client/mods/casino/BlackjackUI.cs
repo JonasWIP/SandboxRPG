@@ -17,6 +17,7 @@ public partial class BlackjackUI : Node3D
 
     private ulong _machineId;
     private CanvasLayer? _popup;
+    private CanvasLayer? _betPopup;
     private readonly Dictionary<string, MeshInstance3D> _cardNodes = new();
     private static readonly Vector3 FeltOrigin = new(0f, 0.55f, 0f);
     private const float CardSpacing = 0.22f;
@@ -95,7 +96,8 @@ public partial class BlackjackUI : Node3D
 
     private void ShowBetPopup()
     {
-        var layer = new CanvasLayer();
+        if (_betPopup != null) { _betPopup.Visible = true; return; }
+        _betPopup = new CanvasLayer();
         var panel = new Panel();
         panel.SetAnchorsPreset(Control.LayoutPreset.Center);
         panel.Size = new Vector2(240, 160);
@@ -107,18 +109,18 @@ public partial class BlackjackUI : Node3D
         var betBtn = new Button { Text = "Place Bet" };
         betBtn.Pressed += () => {
             GameManager.Instance.Conn.Reducers.PlaceBet(_machineId, (ulong)spin.Value);
-            layer.QueueFree();
+            _betPopup!.Visible = false;
         };
         var startBtn = new Button { Text = "Start Round" };
         startBtn.Pressed += () => {
             GameManager.Instance.Conn.Reducers.StartBlackjackRound(_machineId);
-            layer.QueueFree();
+            _betPopup!.Visible = false;
         };
         vbox.AddChild(betBtn);
         vbox.AddChild(startBtn);
         panel.AddChild(vbox);
-        layer.AddChild(panel);
-        GetTree().Root.AddChild(layer);
+        _betPopup.AddChild(panel);
+        GetTree().Root.AddChild(_betPopup);
     }
 
     public void RefreshCards()
@@ -180,6 +182,8 @@ public partial class BlackjackUI : Node3D
     {
         _instances.Remove(_machineId);
         _unsubscribeAll?.Invoke();
+        _popup?.QueueFree();
+        _betPopup?.QueueFree();
     }
 }
 #endif
