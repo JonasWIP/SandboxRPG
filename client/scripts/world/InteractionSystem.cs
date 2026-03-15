@@ -21,7 +21,10 @@ public partial class InteractionSystem : Node
     private static readonly Dictionary<string, Action<ulong>> _structureHandlers = new();
 
     public static void RegisterStructureHandler(string structureType, Action<ulong> handler)
-        => _structureHandlers[structureType] = handler;
+    {
+        if (handler == null) throw new ArgumentNullException(nameof(handler));
+        _structureHandlers[structureType] = handler;
+    }
 
     public override void _Ready()
     {
@@ -167,7 +170,10 @@ public partial class InteractionSystem : Node
                     }
 
                     if (Input.IsActionJustPressed("interact"))
-                        _structureHandlers[structType](structId);
+                    {
+                        var handler = _structureHandlers[structType];
+                        handler?.Invoke(structId);
+                    }
 
                     return true;
                 }
