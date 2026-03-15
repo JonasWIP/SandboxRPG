@@ -661,6 +661,8 @@ namespace SpacetimeDB.Types
             var eventContext = (ReducerEventContext)context;
             return reducer switch
             {
+                Reducer.ArcadeInputPattern args => Reducers.InvokeArcadeInputPattern(eventContext, args),
+                Reducer.ArcadeInputReaction args => Reducers.InvokeArcadeInputReaction(eventContext, args),
                 Reducer.CraftItem args => Reducers.InvokeCraftItem(eventContext, args),
                 Reducer.DepositCoins args => Reducers.InvokeDepositCoins(eventContext, args),
                 Reducer.DropItem args => Reducers.InvokeDropItem(eventContext, args),
@@ -685,6 +687,7 @@ namespace SpacetimeDB.Types
                 Reducer.SkipSeat args => Reducers.InvokeSkipSeat(eventContext, args),
                 Reducer.SpinSlot args => Reducers.InvokeSpinSlot(eventContext, args),
                 Reducer.StandBlackjack args => Reducers.InvokeStandBlackjack(eventContext, args),
+                Reducer.StartArcade args => Reducers.InvokeStartArcade(eventContext, args),
                 Reducer.StartBlackjackRound args => Reducers.InvokeStartBlackjackRound(eventContext, args),
                 Reducer.WithdrawCoins args => Reducers.InvokeWithdrawCoins(eventContext, args),
                 _ => throw new ArgumentOutOfRangeException("Reducer", $"Unknown reducer {reducer}")

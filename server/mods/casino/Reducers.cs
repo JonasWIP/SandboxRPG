@@ -432,6 +432,116 @@ public static partial class Module
         AdvanceToNextSeat(ctx, machineId, game.RoundId);
     }
 
+    // ── Arcade machines ───────────────────────────────────────────────────────
+
+    [Reducer]
+    public static void StartArcade(ReducerContext ctx, ulong machineId, ulong bet)
+    {
+        if (bet == 0) throw new Exception("Bet must be > 0");
+        var sessionNullable = ctx.Db.ArcadeSession.MachineId.Find(machineId);
+        if (sessionNullable is null) throw new Exception("Arcade machine not found");
+        var session = sessionNullable.Value;
+
+        // Piggybacked stale session cleanup
+        if (!IsDefaultIdentity(session.PlayerId) &&
+            session.ExpiresAt > 0 && NowMicros(ctx) > session.ExpiresAt)
+        {
+            var cleared = session;
+            cleared.PlayerId = default;
+            cleared.State = 0;
+            ctx.Db.ArcadeSession.Delete(session);
+            ctx.Db.ArcadeSession.Insert(cleared);
+            sessionNullable = ctx.Db.ArcadeSession.MachineId.Find(machineId);
+            session = sessionNullable!.Value;
+        }
+
+        if (!IsDefaultIdentity(session.PlayerId) && session.PlayerId != ctx.Sender)
+            throw new Exception("Machine occupied");
+
+        DebitCoins(ctx, ctx.Sender, bet, $"arcade_bet:{machineId}");
+
+        string challenge;
+        ulong expiry;
+        if (session.GameType == 0) // Reaction
+        {
+            var rng = new System.Random();
+            int targetMs = rng.Next(1000, 3000);
+            int windowMs = 150;
+            challenge = $"{targetMs}:{windowMs}";
+            expiry = NowMicros(ctx) + 10_000_000; // 10s
+        }
+        else // Pattern
+        {
+            var chars = new[] { 'R', 'G', 'B', 'Y' };
+            var rng = new System.Random();
+            challenge = new string(System.Linq.Enumerable.Range(0, 5)
+                .Select(_ => chars[rng.Next(chars.Length)]).ToArray());
+            expiry = NowMicros(ctx) + 15_000_000; // 15s
+        }
+
+        ctx.Db.ArcadeSession.Delete(session);
+        ctx.Db.ArcadeSession.Insert(new ArcadeSession
+        {
+            MachineId = machineId, PlayerId = ctx.Sender,
+            GameType = session.GameType, State = 1, // Active
+            Bet = bet, ChallengeData = challenge,
+            StartTime = NowMicros(ctx), ExpiresAt = expiry
+        });
+    }
+
+    [Reducer]
+    public static void ArcadeInputReaction(ReducerContext ctx, ulong machineId)
+    {
+        var sessionNullable = ctx.Db.ArcadeSession.MachineId.Find(machineId);
+        if (sessionNullable is null) throw new Exception("Session not found");
+        var session = sessionNullable.Value;
+        if (session.State != 1 || session.PlayerId != ctx.Sender)
+            throw new Exception("Not your active session");
+
+        var parts = session.ChallengeData.Split(':');
+        int targetMs = int.Parse(parts[0]);
+        int windowMs = int.Parse(parts[1]);
+
+        // Use server timestamp exclusively — no client-supplied timing
+        long elapsedMs = (long)((NowMicros(ctx) - session.StartTime) / 1000);
+        bool hit = Math.Abs(elapsedMs - targetMs) <= (windowMs + 200);
+
+        if (hit)
+            CreditCoins(ctx, ctx.Sender, session.Bet * 3, $"arcade_reaction_win:{machineId}");
+
+        ctx.Db.ArcadeSession.Delete(session);
+        ctx.Db.ArcadeSession.Insert(new ArcadeSession
+        {
+            MachineId = machineId, PlayerId = default, GameType = session.GameType,
+            State = 0, Bet = 0, ChallengeData = hit ? "HIT" : "MISS", ExpiresAt = 0
+        });
+    }
+
+    [Reducer]
+    public static void ArcadeInputPattern(ReducerContext ctx, ulong machineId, string playerSequence)
+    {
+        var sessionNullable = ctx.Db.ArcadeSession.MachineId.Find(machineId);
+        if (sessionNullable is null) throw new Exception("Session not found");
+        var session = sessionNullable.Value;
+        if (session.State != 1 || session.PlayerId != ctx.Sender)
+            throw new Exception("Not your active session");
+
+        bool correct = playerSequence == session.ChallengeData;
+        bool expired = NowMicros(ctx) > session.ExpiresAt;
+
+        if (correct && !expired)
+            CreditCoins(ctx, ctx.Sender, session.Bet * 2, $"arcade_pattern_win:{machineId}");
+
+        ctx.Db.ArcadeSession.Delete(session);
+        ctx.Db.ArcadeSession.Insert(new ArcadeSession
+        {
+            MachineId = machineId, PlayerId = default, GameType = session.GameType,
+            State = 0, Bet = 0,
+            ChallengeData = correct && !expired ? "CORRECT" : "WRONG",
+            ExpiresAt = 0
+        });
+    }
+
     // ── Coin Pusher ───────────────────────────────────────────────────────────
 
     [Reducer]
