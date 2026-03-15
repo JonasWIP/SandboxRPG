@@ -18,11 +18,18 @@ public partial class Terrain : StaticBody3D
     [Export] public float SlopeWidth = 20f;
     [Export] public Material? TerrainMaterial;
 
-    /// <summary>Height at world position (X, Z). Used by other systems for Y placement.</summary>
+    /// <summary>Height at world position (X, Z). Used by other systems for Y placement.
+    /// Z≥0: flat beach (Z 0→2) then smooth rise to Y=2 plateau by Z=17.
+    /// Z&lt;0: smooth dip below ocean surface so the ocean plane (Y=-0.2) shows through.</summary>
     public static float HeightAt(float x, float z)
     {
-        float t = Mathf.Clamp((z - 5f) / 20f, 0f, 1f);
-        return Mathf.SmoothStep(0f, 4f, t);
+        if (z >= 0f)
+        {
+            float t = Mathf.Clamp((z - 2f) / 15f, 0f, 1f);
+            return Mathf.SmoothStep(0f, 2f, t);
+        }
+        // Ocean floor — drops 0.3 units per unit of negative Z, clamped at -3
+        return Mathf.Max(z * 0.3f, -3f);
     }
 
     public override void _Ready()

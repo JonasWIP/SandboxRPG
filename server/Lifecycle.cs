@@ -40,8 +40,8 @@ public static partial class Module
                 Name = $"Player_{identity.ToString()[..8]}",
                 PosX = 0f,
                 PosY = 0.3f,
-                PosZ = 0f,
-                RotY = 0f,
+                PosZ = 1f,
+                RotY = (float)Math.PI,   // face inland (+Z direction)
                 Health = 100f,
                 MaxHealth = 100f,
                 Stamina = 100f,
@@ -94,8 +94,8 @@ public static partial class Module
     {
         ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "wood",  Quantity = 5, PosX =  3f, PosY = TerrainHeightAt( 3f,  3f) + 0.2f, PosZ =  3f });
         ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "stone", Quantity = 3, PosX = -4f, PosY = TerrainHeightAt(-4f,  2f) + 0.2f, PosZ =  2f });
-        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "wood",  Quantity = 8, PosX =  7f, PosY = TerrainHeightAt( 7f, -5f) + 0.2f, PosZ = -5f });
-        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "iron",  Quantity = 2, PosX = -8f, PosY = TerrainHeightAt(-8f, -6f) + 0.2f, PosZ = -6f });
+        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "wood",  Quantity = 8, PosX =  7f, PosY = TerrainHeightAt( 7f,  6f) + 0.2f, PosZ =  6f });
+        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "iron",  Quantity = 2, PosX = -8f, PosY = TerrainHeightAt(-8f,  4f) + 0.2f, PosZ =  4f });
         ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "stone", Quantity = 5, PosX = 10f, PosY = TerrainHeightAt(10f,  8f) + 0.2f, PosZ =  8f });
 
         Log.Info("Seeded starter world items.");
@@ -104,8 +104,12 @@ public static partial class Module
     /// <summary>Mirrors the client Terrain.HeightAt formula (no Mathf on server).</summary>
     private static float TerrainHeightAt(float x, float z)
     {
-        float t = Math.Clamp((z - 5f) / 20f, 0f, 1f);
-        return t * t * (3f - 2f * t) * 4f;   // SmoothStep(0, 4, t)
+        if (z >= 0f)
+        {
+            float t = Math.Clamp((z - 2f) / 15f, 0f, 1f);
+            return t * t * (3f - 2f * t) * 2f;   // SmoothStep(0, 2, t)
+        }
+        return Math.Max(z * 0.3f, -3f);   // Ocean floor
     }
 
     private static void SeedWorldObjects(ReducerContext ctx)
