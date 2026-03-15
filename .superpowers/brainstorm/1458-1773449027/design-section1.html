@@ -1,0 +1,78 @@
+<h2>Design — Section 1: World Overview & Chunk System</h2>
+<p class="subtitle">Does this structure look right before we go deeper?</p>
+
+<div style="display: flex; gap: 20px; flex-wrap: wrap;">
+
+<div style="flex: 1; min-width: 280px;">
+<div class="section">
+  <p class="label">World Size & Coordinates</p>
+  <ul style="font-size: 13px; color: #ccc; line-height: 1.8;">
+    <li>Chunk size: <strong>32m × 32m</strong></li>
+    <li>Town zone: <strong>±5 chunks from origin</strong> (320×320m) — pre-generated on Init()</li>
+    <li>Outer world: effectively unbounded, lazy-generated up to a soft cap (~200 chunks radius)</li>
+    <li>Y (height): 0–30m range, sea level at 2m</li>
+  </ul>
+</div>
+
+<div class="section">
+  <p class="label">Biomes (noise-blended)</p>
+  <table style="width:100%; border-collapse:collapse; font-size:12px;">
+    <thead><tr style="border-bottom:1px solid #444;">
+      <th style="text-align:left;padding:4px 8px;color:#888;">Biome</th>
+      <th style="text-align:left;padding:4px 8px;color:#888;">Terrain</th>
+      <th style="text-align:left;padding:4px 8px;color:#888;">Resources</th>
+    </tr></thead>
+    <tbody>
+      <tr style="border-bottom:1px solid #2a2a2a;"><td style="padding:4px 8px;">🌲 Forest</td><td style="padding:4px 8px;">Rolling hills</td><td style="padding:4px 8px;">Wood, herbs</td></tr>
+      <tr style="border-bottom:1px solid #2a2a2a;"><td style="padding:4px 8px;">🌾 Plains</td><td style="padding:4px 8px;">Gently flat</td><td style="padding:4px 8px;">Stone, wheat</td></tr>
+      <tr style="border-bottom:1px solid #2a2a2a;"><td style="padding:4px 8px;">🌿 Swamp</td><td style="padding:4px 8px;">Low, muddy</td><td style="padding:4px 8px;">Herbs, rare wood</td></tr>
+      <tr style="border-bottom:1px solid #2a2a2a;"><td style="padding:4px 8px;">🏔 Mountains</td><td style="padding:4px 8px;">High, steep</td><td style="padding:4px 8px;">Stone, iron ore</td></tr>
+      <tr><td style="padding:4px 8px;">❄ Tundra</td><td style="padding:4px 8px;">Flat, icy</td><td style="padding:4px 8px;">Rare ore, ice</td></tr>
+    </tbody>
+  </table>
+</div>
+</div>
+
+<div style="flex: 1; min-width: 280px;">
+<div class="section">
+  <p class="label">New SpacetimeDB Tables</p>
+  <div style="font-family: monospace; font-size: 12px; background: #111; padding: 12px; border-radius: 6px; line-height: 1.8; color: #ccc;">
+    <div style="color: #6a9a6a;">// One row — world seed &amp; config</div>
+    <div><span style="color:#c08040;">WorldConfig</span> { Seed, ChunkSize, TownRadius }</div>
+    <br>
+    <div style="color: #6a9a6a;">// One row per generated chunk</div>
+    <div><span style="color:#c08040;">WorldChunk</span> {</div>
+    <div style="padding-left:16px;">ChunkKey (PK, packed X|Z),</div>
+    <div style="padding-left:16px;">ChunkX, ChunkZ,</div>
+    <div style="padding-left:16px;">BiomeType,</div>
+    <div style="padding-left:16px;">HeightData (byte[], 33×33),</div>
+    <div style="padding-left:16px;">IsTownZone,</div>
+    <div style="padding-left:16px;">IsGenerated</div>
+    <div>}</div>
+    <br>
+    <div style="color: #6a9a6a;">// One row per node (tree/rock/ore)</div>
+    <div><span style="color:#c08040;">ResourceNode</span> {</div>
+    <div style="padding-left:16px;">Id (AutoInc PK),</div>
+    <div style="padding-left:16px;">ChunkKey,</div>
+    <div style="padding-left:16px;">NodeType, ResourceType,</div>
+    <div style="padding-left:16px;">PosX, PosY, PosZ,</div>
+    <div style="padding-left:16px;">Health, MaxHealth,</div>
+    <div style="padding-left:16px;">RespawnAt (0 = alive)</div>
+    <div>}</div>
+  </div>
+</div>
+
+<div class="section">
+  <p class="label">Generation Flow</p>
+  <ol style="font-size: 13px; color: #ccc; line-height: 2; padding-left: 18px; margin: 0;">
+    <li>Server <code>Init()</code>: store WorldConfig with random seed, pre-generate town chunks</li>
+    <li>Player moves → server checks if chunk exists in DB</li>
+    <li>If not: generate heightmap + biome + resource nodes, insert into DB</li>
+    <li>Client subscribes to WorldChunk + ResourceNode → builds terrain mesh + spawns node visuals</li>
+    <li>Player harvests node → node health decreases → at 0, set RespawnAt timestamp</li>
+    <li>Scheduled reducer checks RespawnAt, restores node health when timer expires</li>
+  </ol>
+</div>
+</div>
+
+</div>

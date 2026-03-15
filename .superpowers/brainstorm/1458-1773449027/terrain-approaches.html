@@ -1,0 +1,45 @@
+<h2>Terrain & Chunk System — 3 Approaches</h2>
+<p class="subtitle">Pick the architecture that feels right. My recommendation is C.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Pre-generate everything on Init()</h3>
+      <p>Fixed world size (e.g. 1600×1600m = 50×50 chunks). Server generates all chunks at startup and stores them in SpacetimeDB. Clients subscribe and receive chunks as they explore.</p>
+      <div class="pros-cons" style="margin-top: 10px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Simple — no on-demand logic</li><li>Every chunk ready instantly</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Slow startup (generating 2500 chunks)</li><li>All data in RAM from the start</li><li>Fixed world size forever</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Lazy on-demand generation</h3>
+      <p>Chunks are generated the first time any player steps into that area. Server stores a "generated" flag per chunk. Resource nodes spawn when the chunk is first created. World can be very large.</p>
+      <div class="pros-cons" style="margin-top: 10px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Memory efficient — only explored areas live in DB</li><li>True exploration feel</li><li>Scales to any world size</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>First player in area gets a generation spike</li><li>More complex chunk state machine</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C ★ Recommended</div>
+    <div class="content">
+      <h3>Hybrid — pre-generate town core, lazy outer world</h3>
+      <p>On Init(), eagerly generate the spawn town zone (fixed area ~200×200m) so it's always ready. The outer world uses lazy on-demand generation as players explore. The biome noise map is seeded once and stored — so chunk biome type is always deterministic even before generation.</p>
+      <div class="pros-cons" style="margin-top: 10px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Town is always stable and ready</li><li>Outer world scales with exploration</li><li>Fast startup</li><li>Biomes are consistent across the whole map</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Two generation paths to implement (eager + lazy)</li><li>Slightly more complex than pure A or B</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 24px; padding: 12px; background: #1a1a1a; border-radius: 6px; border-left: 3px solid #6a8a6a;">
+  <p class="label">Why C?</p>
+  <p style="font-size: 13px; color: #aaa; margin: 4px 0;">The spawn town needs to be deterministic and instantly available when the server starts — you don't want the first player in to trigger a generation spike in the hub. The outer world benefits from lazy loading because most of it will never be visited. Storing the biome seed up front means the whole map is conceptually "known" (you can show a world map), just not yet materialized in the DB.</p>
+</div>

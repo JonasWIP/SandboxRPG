@@ -1,0 +1,127 @@
+<h2>Full World Design — Terrain & Chunk System</h2>
+<p class="subtitle">Updated with voxel terrain, generated structures, and decorations. Review each section.</p>
+
+<div class="section">
+  <p class="label">World Structure</p>
+  <div style="display:flex; gap:12px; flex-wrap:wrap; font-size:13px;">
+    <div style="flex:1; min-width:200px; background:#1a1a1a; border-radius:6px; padding:12px; border-left:3px solid #c8a96e;">
+      <strong style="color:#f0d080;">🏰 Spawn Town</strong>
+      <ul style="color:#aaa; margin:6px 0 0; padding-left:16px; line-height:1.8;">
+        <li>±5 chunks from origin (320×320m)</li>
+        <li>Pre-generated on Init()</li>
+        <li>No building, no terrain edit, no PvP</li>
+        <li>NPCs: shopkeepers, quest-givers, innkeeper</li>
+        <li>Generated structures: market, blacksmith, inn, notice board</li>
+      </ul>
+    </div>
+    <div style="flex:1; min-width:200px; background:#1a1a1a; border-radius:6px; padding:12px; border-left:3px solid #4a8a4a;">
+      <strong style="color:#80c080;">🌍 Outer World</strong>
+      <ul style="color:#aaa; margin:6px 0 0; padding-left:16px; line-height:1.8;">
+        <li>Lazy-generated as players explore</li>
+        <li>5 blended biomes (noise map)</li>
+        <li>Full voxel terrain — dig &amp; fill anywhere</li>
+        <li>Resource nodes on surface</li>
+        <li>Ore veins underground</li>
+        <li>Random POIs &amp; ruins</li>
+      </ul>
+    </div>
+    <div style="flex:1; min-width:200px; background:#1a1a1a; border-radius:6px; padding:12px; border-left:3px solid #6a3a8a;">
+      <strong style="color:#b060d0;">🌀 Alt Worlds</strong>
+      <ul style="color:#aaa; margin:6px 0 0; padding-left:16px; line-height:1.8;">
+        <li>Accessed via portals</li>
+        <li>Separate SpacetimeDB instance</li>
+        <li>Different generation algorithm</li>
+        <li><em style="color:#666;">Out of scope for this spec</em></li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <p class="label">Voxel Terrain (Astroneer-style)</p>
+  <div style="display:flex; gap:16px; flex-wrap:wrap;">
+    <div style="flex:2; min-width:260px; font-size:13px; color:#ccc; line-height:1.8;">
+      <p>Chunks are <strong>32×32×32</strong> voxel grids. Each voxel is a density value (signed byte, –127 to +127). Positive = solid, negative = air. The isosurface at 0 is the terrain surface — rendered with marching cubes on the client.</p>
+      <p>Underground chunks extend to ChunkY = –4 (128m deep). Surface is ChunkY = 0. Sky chunks (ChunkY &gt; 0) are mostly air.</p>
+      <p>Ore veins are a second channel stored alongside density — an <em>ore type</em> byte per voxel (0 = none). When a player digs a voxel containing ore, the ore drops as an item.</p>
+    </div>
+    <div style="flex:1; min-width:200px; font-family:monospace; font-size:12px; background:#111; border-radius:6px; padding:12px; line-height:1.8; color:#ccc;">
+      <div style="color:#6a9a6a;">// 32KB per chunk</div>
+      <span style="color:#c08040;">WorldChunk</span> {<br>
+      &nbsp;&nbsp;ChunkKey (PK),<br>
+      &nbsp;&nbsp;ChunkX, ChunkY, ChunkZ,<br>
+      &nbsp;&nbsp;BiomeType,<br>
+      &nbsp;&nbsp;<span style="color:#8ab4f8;">VoxelDensity</span> byte[32768],<br>
+      &nbsp;&nbsp;<span style="color:#8ab4f8;">VoxelOre</span> byte[32768],<br>
+      &nbsp;&nbsp;IsTownZone,<br>
+      &nbsp;&nbsp;IsGenerated<br>
+      }
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <p class="label">Biomes (noise-blended, 5 types)</p>
+  <table style="width:100%; border-collapse:collapse; font-size:13px;">
+    <thead><tr style="border-bottom:1px solid #444;">
+      <th style="text-align:left;padding:6px 10px;color:#888;">Biome</th>
+      <th style="text-align:left;padding:6px 10px;color:#888;">Terrain feel</th>
+      <th style="text-align:left;padding:6px 10px;color:#888;">Surface nodes</th>
+      <th style="text-align:left;padding:6px 10px;color:#888;">Underground ore</th>
+    </tr></thead>
+    <tbody>
+      <tr style="border-bottom:1px solid #2a2a2a;"><td style="padding:5px 10px;">🌲 Forest</td><td style="padding:5px 10px;">Rolling hills</td><td style="padding:5px 10px;">Trees (wood), herb bushes</td><td style="padding:5px 10px;">Coal, clay</td></tr>
+      <tr style="border-bottom:1px solid #2a2a2a;"><td style="padding:5px 10px;">🌾 Plains</td><td style="padding:5px 10px;">Gently flat</td><td style="padding:5px 10px;">Rock outcrops (stone), wheat</td><td style="padding:5px 10px;">Stone, copper</td></tr>
+      <tr style="border-bottom:1px solid #2a2a2a;"><td style="padding:5px 10px;">🌿 Swamp</td><td style="padding:5px 10px;">Low, muddy</td><td style="padding:5px 10px;">Gnarled trees, mushrooms</td><td style="padding:5px 10px;">Clay, rare herbs</td></tr>
+      <tr style="border-bottom:1px solid #2a2a2a;"><td style="padding:5px 10px;">🏔 Mountains</td><td style="padding:5px 10px;">High, steep</td><td style="padding:5px 10px;">Boulders (stone, iron)</td><td style="padding:5px 10px;">Iron, silver</td></tr>
+      <tr><td style="padding:5px 10px;">❄ Tundra</td><td style="padding:5px 10px;">Flat, icy</td><td style="padding:5px 10px;">Ice shards, sparse trees</td><td style="padding:5px 10px;">Gold, rare crystals</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="section">
+  <p class="label">Server-Side Entities</p>
+  <div style="display:flex; gap:12px; flex-wrap:wrap; font-size:12px; font-family:monospace;">
+    <div style="flex:1; min-width:200px; background:#111; border-radius:6px; padding:10px; line-height:1.8; color:#ccc;">
+      <div style="color:#6a9a6a;">// Trees, rock outcrops, herb bushes</div>
+      <span style="color:#c08040;">ResourceNode</span> {<br>
+      &nbsp;&nbsp;Id, ChunkKey,<br>
+      &nbsp;&nbsp;NodeType, ResourceType,<br>
+      &nbsp;&nbsp;PosX, PosY, PosZ,<br>
+      &nbsp;&nbsp;Health, MaxHealth,<br>
+      &nbsp;&nbsp;RespawnAt<br>
+      }
+    </div>
+    <div style="flex:1; min-width:200px; background:#111; border-radius:6px; padding:10px; line-height:1.8; color:#ccc;">
+      <div style="color:#6a9a6a;">// Wells, crates, mushroom patches</div>
+      <span style="color:#c08040;">WorldObject</span> {<br>
+      &nbsp;&nbsp;Id, ChunkKey,<br>
+      &nbsp;&nbsp;ObjectType,<br>
+      &nbsp;&nbsp;PosX, PosY, PosZ,<br>
+      &nbsp;&nbsp;State, RespawnAt<br>
+      }
+    </div>
+    <div style="flex:1; min-width:200px; background:#111; border-radius:6px; padding:10px; line-height:1.8; color:#ccc;">
+      <div style="color:#6a9a6a;">// Ruins, bandit camps, shrines</div>
+      <span style="color:#c08040;">GeneratedStructure</span> {<br>
+      &nbsp;&nbsp;Id, StructureType,<br>
+      &nbsp;&nbsp;AnchorChunkKey,<br>
+      &nbsp;&nbsp;PosX, PosY, PosZ, RotY,<br>
+      &nbsp;&nbsp;IsCleared<br>
+      }
+    </div>
+  </div>
+  <p style="font-size:12px; color:#666; margin-top:8px;">Decorations (rocks, flowers, fallen logs) are <strong>client-side only</strong> — generated deterministically from chunk seed + biome. No server storage needed.</p>
+</div>
+
+<div class="section">
+  <p class="label">Generation Flow</p>
+  <ol style="font-size:13px; color:#ccc; line-height:2; padding-left:18px; margin:0;">
+    <li><strong>Init()</strong>: Store WorldConfig (seed). Pre-generate all town-zone chunks. Place town structures (inn, market, blacksmith). Spawn town NPCs.</li>
+    <li><strong>Player moves</strong> → server computes chunk column at player XZ position.</li>
+    <li><strong>Missing chunk?</strong> → Generate: sample biome noise → build voxel density + ore channels → insert surface ResourceNodes and WorldObjects → maybe place GeneratedStructure.</li>
+    <li><strong>Client subscribes</strong> to WorldChunk → runs marching cubes → renders terrain mesh. Spawns node visuals from ResourceNode / WorldObject / GeneratedStructure tables. Draws client-side decorations from seed.</li>
+    <li><strong>Player digs/fills</strong> → HarvestTerrain reducer updates VoxelDensity in WorldChunk → clients rebuild mesh.</li>
+    <li><strong>Scheduled reducer</strong> → restores ResourceNode health and WorldObject state when RespawnAt is reached.</li>
+  </ol>
+</div>

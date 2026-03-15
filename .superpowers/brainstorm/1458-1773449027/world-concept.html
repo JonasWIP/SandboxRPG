@@ -1,0 +1,76 @@
+<h2>World Structure — First Pass</h2>
+<p class="subtitle">Based on what you described — does this match the mental model?</p>
+
+<div style="display: flex; gap: 24px; flex-wrap: wrap; margin-top: 16px;">
+
+  <div style="flex: 1; min-width: 280px;">
+    <div class="mockup" style="min-height: 340px;">
+      <div class="mockup-header">World Map Concept</div>
+      <div class="mockup-body" style="padding: 16px; font-family: monospace; font-size: 13px; line-height: 1.8;">
+        <div style="text-align: center; margin-bottom: 12px;">
+          <div style="display: inline-block; border: 2px solid #c8a96e; background: #3a2a10; color: #f0d080; padding: 8px 20px; border-radius: 6px; font-weight: bold;">
+            🏰 SPAWN TOWN
+          </div>
+          <div style="color: #888; font-size: 11px; margin-top: 4px;">Safe zone · No building · NPCs · Shops · Social hub</div>
+        </div>
+        <div style="text-align: center; color: #888; margin: 4px 0;">⬇  travel / portal</div>
+        <div style="display: flex; gap: 8px; justify-content: center; margin: 8px 0;">
+          <div style="border: 1px solid #4a7a4a; background: #1a3a1a; color: #80c080; padding: 6px 12px; border-radius: 4px; font-size: 12px; text-align: center;">
+            🌲 Forest<br><span style="color:#888; font-size:10px;">Buildable · Wood</span>
+          </div>
+          <div style="border: 1px solid #7a7a4a; background: #2a2a10; color: #c0c060; padding: 6px 12px; border-radius: 4px; font-size: 12px; text-align: center;">
+            ⛰ Plains<br><span style="color:#888; font-size:10px;">Buildable · Stone</span>
+          </div>
+          <div style="border: 1px solid #6a4a2a; background: #2a1a0a; color: #c08040; padding: 6px 12px; border-radius: 4px; font-size: 12px; text-align: center;">
+            🏜 Desert<br><span style="color:#888; font-size:10px;">Buildable · Iron</span>
+          </div>
+        </div>
+        <div style="text-align: center; color: #888; margin: 4px 0;">⬇  deeper portals</div>
+        <div style="display: flex; gap: 8px; justify-content: center;">
+          <div style="border: 1px dashed #6a3a6a; background: #1a0a1a; color: #b060b0; padding: 6px 12px; border-radius: 4px; font-size: 12px; text-align: center;">
+            🌀 Alt World A<br><span style="color:#888; font-size:10px;">Diff. gen algorithm</span>
+          </div>
+          <div style="border: 1px dashed #3a5a7a; background: #0a1a2a; color: #6090c0; padding: 6px 12px; border-radius: 4px; font-size: 12px; text-align: center;">
+            🌊 Alt World B<br><span style="color:#888; font-size:10px;">Diff. gen algorithm</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex: 1; min-width: 260px;">
+    <h3>Key properties per zone type</h3>
+    <table style="width:100%; border-collapse: collapse; font-size: 13px;">
+      <thead>
+        <tr style="border-bottom: 1px solid #444;">
+          <th style="text-align:left; padding: 6px 8px; color: #888;">Zone</th>
+          <th style="text-align:center; padding: 6px 8px; color: #888;">Build?</th>
+          <th style="text-align:center; padding: 6px 8px; color: #888;">NPCs?</th>
+          <th style="text-align:center; padding: 6px 8px; color: #888;">PvP?</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom: 1px solid #333;">
+          <td style="padding: 6px 8px;">🏰 Spawn Town</td>
+          <td style="text-align:center; padding: 6px 8px; color: #f07070;">✗</td>
+          <td style="text-align:center; padding: 6px 8px; color: #70c070;">✓</td>
+          <td style="text-align:center; padding: 6px 8px; color: #f07070;">✗</td>
+        </tr>
+        <tr style="border-bottom: 1px solid #333;">
+          <td style="padding: 6px 8px;">🌲 Outer Regions</td>
+          <td style="text-align:center; padding: 6px 8px; color: #70c070;">✓</td>
+          <td style="text-align:center; padding: 6px 8px; color: #888;">?</td>
+          <td style="text-align:center; padding: 6px 8px; color: #888;">?</td>
+        </tr>
+        <tr>
+          <td style="padding: 6px 8px;">🌀 Alt Worlds</td>
+          <td style="text-align:center; padding: 6px 8px; color: #888;">?</td>
+          <td style="text-align:center; padding: 6px 8px; color: #888;">?</td>
+          <td style="text-align:center; padding: 6px 8px; color: #888;">?</td>
+        </tr>
+      </tbody>
+    </table>
+    <p style="color: #888; font-size: 12px; margin-top: 12px;">? = questions still to answer</p>
+  </div>
+
+</div>
