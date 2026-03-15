@@ -252,6 +252,17 @@ public partial class WorldManager : Node3D
 		_                             => 0.5f,
 	};
 
+	public static string? StructureModelPath(string t) => t switch
+	{
+		"wood_wall"   or "stone_wall"  => "res://assets/models/building/wall.glb",
+		"wood_floor"  or "stone_floor" => "res://assets/models/building/floor.glb",
+		"wood_door"                    => "res://assets/models/building/wall-doorway-square.glb",
+		"campfire"                     => "res://assets/models/survival/campfire-pit.glb",
+		"workbench"                    => "res://assets/models/survival/workbench.glb",
+		"chest"                        => "res://assets/models/survival/chest.glb",
+		_                              => null,
+	};
+
 	/// <summary>Recursively applies a color tint to all MeshInstance3D nodes in the subtree.</summary>
 	private static void TintMeshes(Node root, Color color, StandardMaterial3D? mat = null)
 	{

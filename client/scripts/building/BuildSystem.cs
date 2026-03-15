@@ -100,19 +100,41 @@ public partial class BuildSystem : Node
 	{
 		_ghostPreview = new Node3D { Name = "GhostPreview" };
 
-		var mesh = new MeshInstance3D
+		var modelPath = WorldManager.StructureModelPath(structureType);
+		if (modelPath != null && ResourceLoader.Exists(modelPath))
 		{
-			Mesh             = WorldManager.StructureFallbackMesh(structureType),
-			MaterialOverride = new StandardMaterial3D
+			var model = ResourceLoader.Load<PackedScene>(modelPath).Instantiate<Node3D>();
+			ApplyGhostMaterial(model);
+			_ghostPreview.AddChild(model);
+		}
+		else
+		{
+			var mesh = new MeshInstance3D
 			{
-				AlbedoColor  = new Color(0.3f, 0.8f, 0.3f, 0.4f),
-				Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-			},
-		};
-		mesh.Position = new Vector3(0, WorldManager.StructureYOffset(structureType), 0);
+				Mesh             = WorldManager.StructureFallbackMesh(structureType),
+				MaterialOverride = new StandardMaterial3D
+				{
+					AlbedoColor  = new Color(0.3f, 0.8f, 0.3f, 0.4f),
+					Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+				},
+			};
+			mesh.Position = new Vector3(0, WorldManager.StructureYOffset(structureType), 0);
+			_ghostPreview.AddChild(mesh);
+		}
 
-		_ghostPreview.AddChild(mesh);
 		GetParent().AddChild(_ghostPreview);
+	}
+
+	private static void ApplyGhostMaterial(Node node, StandardMaterial3D? mat = null)
+	{
+		mat ??= new StandardMaterial3D
+		{
+			AlbedoColor  = new Color(0.3f, 0.8f, 0.3f, 0.4f),
+			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+		};
+		if (node is MeshInstance3D mi) mi.MaterialOverride = mat;
+		foreach (Node child in node.GetChildren())
+			ApplyGhostMaterial(child, mat);
 	}
 
 	private void ClearGhost()
