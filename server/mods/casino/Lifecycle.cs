@@ -74,6 +74,9 @@ public static partial class Module
                 ctx.Db.ArcadeSession.Insert(new ArcadeSession
                     { MachineId = machineId, GameType = 1, State = 0 });
                 break;
+            case "casino_exchange":
+                // Exchange machine uses currency mod reducers directly — no session table needed
+                break;
         }
     }
 

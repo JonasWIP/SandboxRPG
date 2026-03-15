@@ -15,7 +15,9 @@ public static class CasinoUI
         InteractionSystem.RegisterStructureHandler("casino_coin_pusher",     id => CoinPusherUI.Open(id));
         InteractionSystem.RegisterStructureHandler("casino_arcade_reaction", id => ArcadeUI.TryTriggerReaction(id));
         InteractionSystem.RegisterStructureHandler("casino_arcade_pattern",  id => ArcadeUI.Open(id, isPattern: true));
+#if MOD_CURRENCY
         InteractionSystem.RegisterStructureHandler("casino_exchange",        id => ExchangeUI.Open(id));
+#endif
     }
 }
 #endif
