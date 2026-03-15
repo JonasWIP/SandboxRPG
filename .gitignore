@@ -48,3 +48,6 @@ tools/game-mcp/godot.log
 .superpowers/**/.server-info
 .superpowers/**/.server.log
 .superpowers/**/.server.pid
+
+# Git worktrees
+.worktrees/

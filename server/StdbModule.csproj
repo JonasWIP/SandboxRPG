@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>SandboxRPG.Server</RootNamespace>
+    <DefineConstants>$(DefineConstants);MOD_CURRENCY;MOD_CASINO</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="SpacetimeDB.Runtime" Version="2.0.*" />

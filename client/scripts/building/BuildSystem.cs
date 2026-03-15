@@ -5,7 +5,8 @@ namespace SandboxRPG;
 /// <summary>
 /// Building system — no separate build mode toggle.
 /// Building is active automatically when the selected hotbar slot holds a
-/// placeable structure item.  Left-click places, R rotates the ghost.
+/// placeable structure item.  Left-click places, R rotates the ghost 90° steps.
+/// Ghost uses Y-axis rotation only (no slope alignment).
 /// </summary>
 public partial class BuildSystem : Node
 {
@@ -18,9 +19,14 @@ public partial class BuildSystem : Node
 		"wood_door", "campfire", "workbench", "chest",
 	};
 
-	private Node3D?  _ghostPreview;
+	public static bool IsBuildable(string? itemType) =>
+		itemType != null && BuildableTypes.Contains(itemType);
+
+	private Node3D?   _ghostPreview;
 	private Camera3D? _camera;
-	private string?   _currentGhostType; // item type the ghost was built for
+	private string?   _currentGhostType;
+	private float _ghostRotationY = 0f;  // accumulated rotation in degrees (90° steps)
+	private bool  _rWasPressed    = false;
 
 	public override void _Process(double delta)
 	{
@@ -34,7 +40,7 @@ public partial class BuildSystem : Node
 		}
 
 		var activeItem = Hotbar.Instance?.ActiveItemType;
-		bool isBuildable = activeItem != null && BuildableTypes.Contains(activeItem);
+		bool isBuildable = IsBuildable(activeItem);
 
 		if (!isBuildable)
 		{
@@ -46,17 +52,19 @@ public partial class BuildSystem : Node
 		if (activeItem != _currentGhostType)
 		{
 			ClearGhost();
+			_ghostRotationY = 0f;
 			_currentGhostType = activeItem;
 		}
 
 		UpdateGhostPosition();
 
-		// Rotate ghost with R
-		if (Input.IsKeyPressed(Key.R) && _ghostPreview != null)
-			_ghostPreview.RotateY(Mathf.Pi / 2 * (float)delta * 3);
+		// Discrete 90° step on R press
+		if (Input.IsKeyPressed(Key.R) && !_rWasPressed)
+			_ghostRotationY = (_ghostRotationY + 90f) % 360f;
+		_rWasPressed = Input.IsKeyPressed(Key.R);
 
 		// Place on left-click
-		if (Input.IsMouseButtonPressed(MouseButton.Left) && _ghostPreview != null)
+		if (Input.IsActionJustPressed("primary_attack") && _ghostPreview != null)
 			PlaceStructure();
 	}
 
@@ -67,62 +75,67 @@ public partial class BuildSystem : Node
 	private void UpdateGhostPosition()
 	{
 		if (_camera == null) return;
+		var spaceState = _camera.GetWorld3D()?.DirectSpaceState;
+		if (spaceState == null) return;
 
 		var screenCenter = GetViewport().GetVisibleRect().Size / 2;
-		var from      = _camera.ProjectRayOrigin(screenCenter);
-		var direction = _camera.ProjectRayNormal(screenCenter);
+		var from = _camera.ProjectRayOrigin(screenCenter);
+		var dir  = _camera.ProjectRayNormal(screenCenter);
 
-		if (direction.Y == 0) return;
+		var result = spaceState.IntersectRay(PhysicsRayQueryParameters3D.Create(from, from + dir * PlaceRange));
+		if (result.Count == 0) return;
 
-		float t = -from.Y / direction.Y;
-		if (t <= 0 || t >= PlaceRange) return;
+		var hitPos = (Vector3)result["position"];
+		hitPos.X = Mathf.Round(hitPos.X / GridSize) * GridSize;
+		hitPos.Z = Mathf.Round(hitPos.Z / GridSize) * GridSize;
+		hitPos.Y = Mathf.Snapped(hitPos.Y, 0.25f);
 
-		var hit = from + direction * t;
-		float snappedX = Mathf.Round(hit.X / GridSize) * GridSize;
-		float snappedZ = Mathf.Round(hit.Z / GridSize) * GridSize;
+		if (_ghostPreview == null) CreateGhostPreview(_currentGhostType!);
+		if (_ghostPreview == null) return;
 
-		if (_ghostPreview == null)
-			CreateGhostPreview(_currentGhostType!);
-
-		if (_ghostPreview != null)
-			_ghostPreview.GlobalPosition = new Vector3(snappedX, 0, snappedZ);
+		var yRot = Basis.FromEuler(new Vector3(0, Mathf.DegToRad(_ghostRotationY), 0));
+		_ghostPreview.GlobalTransform = new Transform3D(yRot, hitPos);
 	}
 
 	private void CreateGhostPreview(string structureType)
 	{
 		_ghostPreview = new Node3D { Name = "GhostPreview" };
 
-		var mesh = new MeshInstance3D();
-		mesh.Mesh = structureType switch
+		var modelPath = WorldManager.StructureModelPath(structureType);
+		if (modelPath != null && ResourceLoader.Exists(modelPath))
 		{
-			"wood_wall"  or "stone_wall"  => new BoxMesh { Size = new Vector3(2f, 2.5f, 0.2f) },
-			"wood_floor" or "stone_floor" => new BoxMesh { Size = new Vector3(2f, 0.1f, 2f) },
-			"wood_door"                   => new BoxMesh { Size = new Vector3(1f, 2.2f, 0.15f) },
-			"campfire"                    => new CylinderMesh { TopRadius = 0.3f, BottomRadius = 0.5f, Height = 0.3f },
-			"workbench"                   => new BoxMesh { Size = new Vector3(1.2f, 0.8f, 0.8f) },
-			"chest"                       => new BoxMesh { Size = new Vector3(0.8f, 0.6f, 0.5f) },
-			_                             => new BoxMesh { Size = new Vector3(1f, 1f, 1f) },
-		};
+			var model = ResourceLoader.Load<PackedScene>(modelPath).Instantiate<Node3D>();
+			ApplyGhostMaterial(model);
+			_ghostPreview.AddChild(model);
+		}
+		else
+		{
+			var mesh = new MeshInstance3D
+			{
+				Mesh             = WorldManager.StructureFallbackMesh(structureType),
+				MaterialOverride = new StandardMaterial3D
+				{
+					AlbedoColor  = new Color(0.3f, 0.8f, 0.3f, 0.4f),
+					Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+				},
+			};
+			mesh.Position = new Vector3(0, WorldManager.StructureYOffset(structureType), 0);
+			_ghostPreview.AddChild(mesh);
+		}
 
-		mesh.MaterialOverride = new StandardMaterial3D
+		GetParent().AddChild(_ghostPreview);
+	}
+
+	private static void ApplyGhostMaterial(Node node, StandardMaterial3D? mat = null)
+	{
+		mat ??= new StandardMaterial3D
 		{
 			AlbedoColor  = new Color(0.3f, 0.8f, 0.3f, 0.4f),
 			Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
 		};
-
-		mesh.Position = new Vector3(0, structureType switch
-		{
-			"wood_wall"  or "stone_wall"  => 1.25f,
-			"wood_floor" or "stone_floor" => 0.05f,
-			"wood_door"                   => 1.1f,
-			"campfire"                    => 0.15f,
-			"workbench"                   => 0.4f,
-			"chest"                       => 0.3f,
-			_                             => 0.5f,
-		}, 0);
-
-		_ghostPreview.AddChild(mesh);
-		GetParent().AddChild(_ghostPreview);
+		if (node is MeshInstance3D mi) mi.MaterialOverride = mat;
+		foreach (Node child in node.GetChildren())
+			ApplyGhostMaterial(child, mat);
 	}
 
 	private void ClearGhost()
@@ -142,7 +155,7 @@ public partial class BuildSystem : Node
 		if (_ghostPreview == null || _currentGhostType == null) return;
 
 		var pos  = _ghostPreview.GlobalPosition;
-		var rotY = _ghostPreview.Rotation.Y;
+		var rotY = Mathf.DegToRad(_ghostRotationY);
 		GameManager.Instance.PlaceBuildStructure(_currentGhostType, pos.X, pos.Y, pos.Z, rotY);
 	}
 }

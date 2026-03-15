@@ -4,6 +4,7 @@
     <EnableDynamicLoading>true</EnableDynamicLoading>
     <RootNamespace>SandboxRPG</RootNamespace>
     <Nullable>enable</Nullable>
+    <DefineConstants>$(DefineConstants);MOD_CURRENCY;MOD_CASINO</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="SpacetimeDB.ClientSDK" Version="2.0.1" />

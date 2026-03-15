@@ -27,12 +27,23 @@ namespace SpacetimeDB.Types
     {
         public RemoteTables(DbConnection conn)
         {
+            AddTable(AdminList = new(conn));
+            AddTable(ArcadeSession = new(conn));
+            AddTable(BlackjackGame = new(conn));
+            AddTable(BlackjackSeat = new(conn));
             AddTable(ChatMessage = new(conn));
+            AddTable(CoinPusherState = new(conn));
             AddTable(CraftingRecipe = new(conn));
+            AddTable(CurrencyBalance = new(conn));
+            AddTable(CurrencyTransaction = new(conn));
             AddTable(InventoryItem = new(conn));
+            AddTable(ModConfig = new(conn));
             AddTable(PlacedStructure = new(conn));
             AddTable(Player = new(conn));
+            AddTable(SlotSession = new(conn));
+            AddTable(TerrainConfig = new(conn));
             AddTable(WorldItem = new(conn));
+            AddTable(WorldObject = new(conn));
         }
     }
 
@@ -529,24 +540,46 @@ namespace SpacetimeDB.Types
 
         internal static string[] AllTablesSqlQueries() => new string[]
         {
+            new QueryBuilder().From.AdminList().ToSql(),
+            new QueryBuilder().From.ArcadeSession().ToSql(),
+            new QueryBuilder().From.BlackjackGame().ToSql(),
+            new QueryBuilder().From.BlackjackSeat().ToSql(),
             new QueryBuilder().From.ChatMessage().ToSql(),
+            new QueryBuilder().From.CoinPusherState().ToSql(),
             new QueryBuilder().From.CraftingRecipe().ToSql(),
+            new QueryBuilder().From.CurrencyBalance().ToSql(),
+            new QueryBuilder().From.CurrencyTransaction().ToSql(),
             new QueryBuilder().From.InventoryItem().ToSql(),
+            new QueryBuilder().From.ModConfig().ToSql(),
             new QueryBuilder().From.PlacedStructure().ToSql(),
             new QueryBuilder().From.Player().ToSql(),
+            new QueryBuilder().From.SlotSession().ToSql(),
+            new QueryBuilder().From.TerrainConfig().ToSql(),
             new QueryBuilder().From.WorldItem().ToSql(),
+            new QueryBuilder().From.WorldObject().ToSql(),
         }
         ;
     }
 
     public sealed class From
     {
+        public global::SpacetimeDB.Table<AdminList, AdminListCols, AdminListIxCols> AdminList() => new("admin_list", new AdminListCols("admin_list"), new AdminListIxCols("admin_list"));
+        public global::SpacetimeDB.Table<ArcadeSession, ArcadeSessionCols, ArcadeSessionIxCols> ArcadeSession() => new("arcade_session", new ArcadeSessionCols("arcade_session"), new ArcadeSessionIxCols("arcade_session"));
+        public global::SpacetimeDB.Table<BlackjackGame, BlackjackGameCols, BlackjackGameIxCols> BlackjackGame() => new("blackjack_game", new BlackjackGameCols("blackjack_game"), new BlackjackGameIxCols("blackjack_game"));
+        public global::SpacetimeDB.Table<BlackjackSeat, BlackjackSeatCols, BlackjackSeatIxCols> BlackjackSeat() => new("blackjack_seat", new BlackjackSeatCols("blackjack_seat"), new BlackjackSeatIxCols("blackjack_seat"));
         public global::SpacetimeDB.Table<ChatMessage, ChatMessageCols, ChatMessageIxCols> ChatMessage() => new("chat_message", new ChatMessageCols("chat_message"), new ChatMessageIxCols("chat_message"));
+        public global::SpacetimeDB.Table<CoinPusherState, CoinPusherStateCols, CoinPusherStateIxCols> CoinPusherState() => new("coin_pusher_state", new CoinPusherStateCols("coin_pusher_state"), new CoinPusherStateIxCols("coin_pusher_state"));
         public global::SpacetimeDB.Table<CraftingRecipe, CraftingRecipeCols, CraftingRecipeIxCols> CraftingRecipe() => new("crafting_recipe", new CraftingRecipeCols("crafting_recipe"), new CraftingRecipeIxCols("crafting_recipe"));
+        public global::SpacetimeDB.Table<CurrencyBalance, CurrencyBalanceCols, CurrencyBalanceIxCols> CurrencyBalance() => new("currency_balance", new CurrencyBalanceCols("currency_balance"), new CurrencyBalanceIxCols("currency_balance"));
+        public global::SpacetimeDB.Table<CurrencyTransaction, CurrencyTransactionCols, CurrencyTransactionIxCols> CurrencyTransaction() => new("currency_transaction", new CurrencyTransactionCols("currency_transaction"), new CurrencyTransactionIxCols("currency_transaction"));
         public global::SpacetimeDB.Table<InventoryItem, InventoryItemCols, InventoryItemIxCols> InventoryItem() => new("inventory_item", new InventoryItemCols("inventory_item"), new InventoryItemIxCols("inventory_item"));
+        public global::SpacetimeDB.Table<ModConfig, ModConfigCols, ModConfigIxCols> ModConfig() => new("mod_config", new ModConfigCols("mod_config"), new ModConfigIxCols("mod_config"));
         public global::SpacetimeDB.Table<PlacedStructure, PlacedStructureCols, PlacedStructureIxCols> PlacedStructure() => new("placed_structure", new PlacedStructureCols("placed_structure"), new PlacedStructureIxCols("placed_structure"));
         public global::SpacetimeDB.Table<Player, PlayerCols, PlayerIxCols> Player() => new("player", new PlayerCols("player"), new PlayerIxCols("player"));
+        public global::SpacetimeDB.Table<SlotSession, SlotSessionCols, SlotSessionIxCols> SlotSession() => new("slot_session", new SlotSessionCols("slot_session"), new SlotSessionIxCols("slot_session"));
+        public global::SpacetimeDB.Table<TerrainConfig, TerrainConfigCols, TerrainConfigIxCols> TerrainConfig() => new("terrain_config", new TerrainConfigCols("terrain_config"), new TerrainConfigIxCols("terrain_config"));
         public global::SpacetimeDB.Table<WorldItem, WorldItemCols, WorldItemIxCols> WorldItem() => new("world_item", new WorldItemCols("world_item"), new WorldItemIxCols("world_item"));
+        public global::SpacetimeDB.Table<WorldObject, WorldObjectCols, WorldObjectIxCols> WorldObject() => new("world_object", new WorldObjectCols("world_object"), new WorldObjectIxCols("world_object"));
     }
 
     public sealed class TypedSubscriptionBuilder
@@ -628,16 +661,35 @@ namespace SpacetimeDB.Types
             var eventContext = (ReducerEventContext)context;
             return reducer switch
             {
+                Reducer.ArcadeInputPattern args => Reducers.InvokeArcadeInputPattern(eventContext, args),
+                Reducer.ArcadeInputReaction args => Reducers.InvokeArcadeInputReaction(eventContext, args),
                 Reducer.CraftItem args => Reducers.InvokeCraftItem(eventContext, args),
+                Reducer.DepositCoins args => Reducers.InvokeDepositCoins(eventContext, args),
                 Reducer.DropItem args => Reducers.InvokeDropItem(eventContext, args),
+                Reducer.ExchangeResources args => Reducers.InvokeExchangeResources(eventContext, args),
+                Reducer.GrantAdmin args => Reducers.InvokeGrantAdmin(eventContext, args),
+                Reducer.HarvestWorldObject args => Reducers.InvokeHarvestWorldObject(eventContext, args),
+                Reducer.HitBlackjack args => Reducers.InvokeHitBlackjack(eventContext, args),
+                Reducer.JoinBlackjack args => Reducers.InvokeJoinBlackjack(eventContext, args),
+                Reducer.LeaveBlackjack args => Reducers.InvokeLeaveBlackjack(eventContext, args),
                 Reducer.MoveItemToSlot args => Reducers.InvokeMoveItemToSlot(eventContext, args),
                 Reducer.MovePlayer args => Reducers.InvokeMovePlayer(eventContext, args),
                 Reducer.PickupItem args => Reducers.InvokePickupItem(eventContext, args),
+                Reducer.PlaceBet args => Reducers.InvokePlaceBet(eventContext, args),
                 Reducer.PlaceStructure args => Reducers.InvokePlaceStructure(eventContext, args),
+                Reducer.PushCoin args => Reducers.InvokePushCoin(eventContext, args),
+                Reducer.ReleaseSlot args => Reducers.InvokeReleaseSlot(eventContext, args),
                 Reducer.RemoveStructure args => Reducers.InvokeRemoveStructure(eventContext, args),
                 Reducer.SendChat args => Reducers.InvokeSendChat(eventContext, args),
                 Reducer.SetColor args => Reducers.InvokeSetColor(eventContext, args),
+                Reducer.SetModEnabled args => Reducers.InvokeSetModEnabled(eventContext, args),
                 Reducer.SetName args => Reducers.InvokeSetName(eventContext, args),
+                Reducer.SkipSeat args => Reducers.InvokeSkipSeat(eventContext, args),
+                Reducer.SpinSlot args => Reducers.InvokeSpinSlot(eventContext, args),
+                Reducer.StandBlackjack args => Reducers.InvokeStandBlackjack(eventContext, args),
+                Reducer.StartArcade args => Reducers.InvokeStartArcade(eventContext, args),
+                Reducer.StartBlackjackRound args => Reducers.InvokeStartBlackjackRound(eventContext, args),
+                Reducer.WithdrawCoins args => Reducers.InvokeWithdrawCoins(eventContext, args),
                 _ => throw new ArgumentOutOfRangeException("Reducer", $"Unknown reducer {reducer}")
             };
         }

@@ -1,0 +1,6 @@
+{
+  "id": "casino",
+  "version": "1.0.0",
+  "displayName": "Casino Pack",
+  "dependencies": ["currency"]
+}

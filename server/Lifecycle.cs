@@ -1,9 +1,16 @@
 using SpacetimeDB;
+using System;
 
 namespace SandboxRPG.Server;
 
 public static partial class Module
 {
+    // Terrain defaults — must match the TerrainConfig row inserted in SeedTerrainConfig.
+    private const uint  TerrainSeed      = 42;
+    private const float TerrainNoiseScale = 0.04f;
+    private const float TerrainNoiseAmp   = 1.2f;
+    private const float TerrainWorldSize  = 500f;
+
     // =========================================================================
     // LIFECYCLE REDUCERS
     // Called automatically by SpacetimeDB — not invokable by clients.
@@ -13,8 +20,20 @@ public static partial class Module
     public static void Init(ReducerContext ctx)
     {
         Log.Info("SandboxRPG server module initialized!");
+        SeedTerrainConfig(ctx);
         SeedRecipes(ctx);
         SeedWorldItems(ctx);
+        SeedWorldObjects(ctx);
+
+        // Seed mod config rows (idempotent — only insert if missing)
+        if (ctx.Db.ModConfig.ModId.Find("currency") == null)
+            ctx.Db.ModConfig.Insert(new ModConfig { ModId = "currency", Enabled = true, Version = "1.0.0", Dependencies = "" });
+        if (ctx.Db.ModConfig.ModId.Find("casino") == null)
+            ctx.Db.ModConfig.Insert(new ModConfig { ModId = "casino", Enabled = true, Version = "1.0.0", Dependencies = "currency" });
+
+#if MOD_CASINO
+        SeedCasino(ctx);
+#endif
     }
 
     [Reducer(ReducerKind.ClientConnected)]
@@ -37,9 +56,9 @@ public static partial class Module
                 Identity = identity,
                 Name = $"Player_{identity.ToString()[..8]}",
                 PosX = 0f,
-                PosY = 1f,
-                PosZ = 0f,
-                RotY = 0f,
+                PosY = 0.3f,
+                PosZ = 1f,
+                RotY = (float)Math.PI,   // face inland (+Z direction)
                 Health = 100f,
                 MaxHealth = 100f,
                 Stamina = 100f,
@@ -54,6 +73,10 @@ public static partial class Module
 
             Log.Info($"New player created: {identity}");
         }
+
+#if MOD_CURRENCY
+        GrantStartingBalance(ctx, ctx.Sender);
+#endif
     }
 
     [Reducer(ReducerKind.ClientDisconnected)]
@@ -90,12 +113,124 @@ public static partial class Module
 
     private static void SeedWorldItems(ReducerContext ctx)
     {
-        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "wood",  Quantity = 5, PosX =  3f, PosY = 0.5f, PosZ =  3f });
-        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "stone", Quantity = 3, PosX = -4f, PosY = 0.5f, PosZ =  2f });
-        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "wood",  Quantity = 8, PosX =  7f, PosY = 0.5f, PosZ = -5f });
-        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "iron",  Quantity = 2, PosX = -8f, PosY = 0.5f, PosZ = -6f });
-        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "stone", Quantity = 5, PosX = 10f, PosY = 0.5f, PosZ =  8f });
+        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "wood",  Quantity = 5, PosX =  3f, PosY = TerrainHeightAt( 3f,  3f) + 0.2f, PosZ =  3f });
+        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "stone", Quantity = 3, PosX = -4f, PosY = TerrainHeightAt(-4f,  2f) + 0.2f, PosZ =  2f });
+        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "wood",  Quantity = 8, PosX =  7f, PosY = TerrainHeightAt( 7f,  6f) + 0.2f, PosZ =  6f });
+        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "iron",  Quantity = 2, PosX = -8f, PosY = TerrainHeightAt(-8f,  4f) + 0.2f, PosZ =  4f });
+        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "stone", Quantity = 5, PosX = 10f, PosY = TerrainHeightAt(10f,  8f) + 0.2f, PosZ =  8f });
 
         Log.Info("Seeded starter world items.");
+    }
+
+    private static void SeedTerrainConfig(ReducerContext ctx)
+    {
+        ctx.Db.TerrainConfig.Insert(new TerrainConfig
+        {
+            Id             = 0,
+            Seed           = TerrainSeed,
+            WorldSize      = TerrainWorldSize,
+            NoiseScale     = TerrainNoiseScale,
+            NoiseAmplitude = TerrainNoiseAmp,
+        });
+        Log.Info("Seeded terrain config.");
+    }
+
+    /// <summary>Mirrors client Terrain.HeightAt — must stay in sync with module constants.</summary>
+    private static float TerrainHeightAt(float x, float z)
+    {
+        if (z < 0f) return (float)Math.Max(z * 0.15, -3.0);
+        double t     = Math.Clamp((z - 5.0) / 30.0, 0.0, 1.0);
+        double baseH = t * t * (3.0 - 2.0 * t) * 2.0;
+        double nr    = Math.Clamp((z - 8.0) / 20.0, 0.0, 1.0);
+        double s     = TerrainSeed * 0.001;
+        double noise = Math.Sin(x * TerrainNoiseScale + s) * Math.Cos(z * TerrainNoiseScale * 1.7 + s * 1.3) * TerrainNoiseAmp
+                     + Math.Sin((x + z) * TerrainNoiseScale * 2.9 + s * 0.7) * TerrainNoiseAmp * 0.3;
+        return (float)(baseH + noise * nr);
+    }
+
+    private static void SeedWorldObjects(ReducerContext ctx)
+    {
+        var rng = new Random(42);
+
+        WorldObject MakeObject(string type, float xMin, float xMax, float zMin, float zMax, uint hp)
+        {
+            float x = (float)(rng.NextDouble() * (xMax - xMin) + xMin);
+            float z = (float)(rng.NextDouble() * (zMax - zMin) + zMin);
+            return new WorldObject
+            {
+                ObjectType = type,
+                PosX = x, PosY = TerrainHeightAt(x, z), PosZ = z,
+                RotY = (float)(rng.NextDouble() * Math.PI * 2),
+                Health = hp, MaxHealth = hp,
+            };
+        }
+
+        for (int i = 0; i < 250; i++)  ctx.Db.WorldObject.Insert(MakeObject("tree_pine",  -200f, 200f,  30f, 230f, 100));
+        for (int i = 0; i < 60;  i++)  ctx.Db.WorldObject.Insert(MakeObject("tree_dead",  -150f, 150f,  20f,  60f, 60));
+        for (int i = 0; i < 90;  i++)  ctx.Db.WorldObject.Insert(MakeObject("rock_large", -200f, 200f,   0f, 150f, 150));
+        for (int i = 0; i < 75;  i++)  ctx.Db.WorldObject.Insert(MakeObject("rock_small", -220f, 220f, -20f, 170f, 80));
+        for (int i = 0; i < 50;  i++)  ctx.Db.WorldObject.Insert(MakeObject("bush",       -100f, 100f,   5f,  50f, 30));
+
+        Log.Info("Seeded world objects.");
+    }
+
+    // =========================================================================
+    // MOD FRAMEWORK REDUCERS
+    // =========================================================================
+
+    /// <summary>
+    /// First-run bootstrap. Only succeeds when AdminList is empty.
+    /// Call once to make yourself admin, then others via SetModEnabled.
+    /// </summary>
+    [Reducer]
+    public static void GrantAdmin(ReducerContext ctx, Identity target)
+    {
+        if (ctx.Db.AdminList.Iter().Any())
+            throw new Exception("AdminList already populated. Use an existing admin.");
+        ctx.Db.AdminList.Insert(new AdminList { PlayerId = target });
+    }
+
+    [Reducer]
+    public static void SetModEnabled(ReducerContext ctx, string modId, bool enabled)
+    {
+        // Auth check
+        if (ctx.Db.AdminList.PlayerId.Find(ctx.Sender) == null)
+            throw new Exception("Not authorized");
+
+        var rowNullable = ctx.Db.ModConfig.ModId.Find(modId);
+        if (rowNullable == null)
+            throw new Exception($"Unknown mod: {modId}");
+        var row = rowNullable.Value;
+
+        if (enabled)
+        {
+            // Validate all dependencies are enabled first
+            foreach (var dep in row.Dependencies.Split(',', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var depRow = ctx.Db.ModConfig.ModId.Find(dep);
+                if (depRow == null || !depRow.Value.Enabled)
+                    throw new Exception($"Dependency '{dep}' must be enabled first");
+            }
+        }
+        else
+        {
+            // Validate no enabled mods depend on this one
+            foreach (var other in ctx.Db.ModConfig.Iter())
+            {
+                if (!other.Enabled) continue;
+                var deps = other.Dependencies.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                if (deps.Contains(modId))
+                    throw new Exception($"Mod '{other.ModId}' depends on '{modId}'. Disable it first.");
+            }
+        }
+
+        ctx.Db.ModConfig.Delete(row);
+        ctx.Db.ModConfig.Insert(new ModConfig
+        {
+            ModId = row.ModId,
+            Enabled = enabled,
+            Version = row.Version,
+            Dependencies = row.Dependencies
+        });
     }
 }

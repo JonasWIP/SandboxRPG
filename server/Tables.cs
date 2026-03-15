@@ -93,4 +93,52 @@ public static partial class Module
         public string Text;
         public ulong Timestamp; // microseconds since epoch
     }
+
+    /// <summary>Harvestable and decorative world objects (trees, rocks, bushes).
+    /// Seeded on Init, deleted when health reaches 0.</summary>
+    [Table(Name = "world_object", Public = true)]
+    public partial struct WorldObject
+    {
+        [AutoInc][PrimaryKey]
+        public ulong Id;
+        public string ObjectType;   // "tree_pine", "rock_large", "rock_small", "tree_dead", "bush"
+        public float PosX;
+        public float PosY;
+        public float PosZ;
+        public float RotY;          // Y-axis rotation in radians
+        public uint Health;
+        public uint MaxHealth;
+    }
+
+    /// <summary>Singleton terrain configuration. Always has exactly one row (Id = 0).
+    /// Clients subscribe and regenerate terrain mesh + collision whenever this changes.</summary>
+    [Table(Name = "terrain_config", Public = true)]
+    public partial struct TerrainConfig
+    {
+        [PrimaryKey]
+        public uint Id;            // always 0
+        public uint Seed;
+        public float WorldSize;    // units (side length of the square world)
+        public float NoiseScale;   // spatial frequency of hills
+        public float NoiseAmplitude; // max height added by noise
+    }
+
+    // --- Mod Framework (always compiled, no #if guard) ---
+
+    [Table(Name = "mod_config", Public = true)]
+    public partial struct ModConfig
+    {
+        [PrimaryKey]
+        public string ModId;
+        public bool Enabled;
+        public string Version;
+        public string Dependencies; // comma-separated mod IDs
+    }
+
+    [Table(Name = "admin_list", Public = true)]
+    public partial struct AdminList
+    {
+        [PrimaryKey]
+        public Identity PlayerId;
+    }
 }
