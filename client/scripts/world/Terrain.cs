@@ -16,6 +16,7 @@ public partial class Terrain : StaticBody3D
     [Export] public float MaxHeight  = 4f;
     [Export] public float BeachEnd   = 5f;
     [Export] public float SlopeWidth = 20f;
+    [Export] public Material? TerrainMaterial;
 
     /// <summary>Height at world position (X, Z). Used by other systems for Y placement.</summary>
     public static float HeightAt(float x, float z)
@@ -26,6 +27,7 @@ public partial class Terrain : StaticBody3D
 
     public override void _Ready()
     {
+        GD.Print("[Terrain] _Ready called");
         GenerateMesh();
         GenerateCollision();
     }
@@ -34,6 +36,23 @@ public partial class Terrain : StaticBody3D
     {
         var meshInstance = GetNode<MeshInstance3D>("MeshInstance3D");
         meshInstance.Mesh = BuildArrayMesh();
+
+        // Use exported material if set, otherwise load shader from path
+        Material? mat = TerrainMaterial;
+        if (mat == null)
+        {
+            const string shaderPath = "res://assets/shaders/terrain_blend.gdshader";
+            if (ResourceLoader.Exists(shaderPath))
+            {
+                var shader = ResourceLoader.Load<Shader>(shaderPath);
+                mat = new ShaderMaterial { Shader = shader };
+            }
+        }
+
+        if (mat != null)
+            meshInstance.SetSurfaceOverrideMaterial(0, mat);
+        else
+            GD.PrintErr("[Terrain] No material could be applied!");
     }
 
     private void GenerateCollision()
@@ -94,8 +113,8 @@ public partial class Terrain : StaticBody3D
         for (int x = 0; x < Subdivisions; x++)
         {
             int i = z * w + x;
-            indices.Add(i);         indices.Add(i + w + 1); indices.Add(i + 1);
-            indices.Add(i);         indices.Add(i + w);     indices.Add(i + w + 1);
+            indices.Add(i);         indices.Add(i + 1);     indices.Add(i + w + 1);
+            indices.Add(i);         indices.Add(i + w + 1); indices.Add(i + w);
         }
 
         var arrays = new Godot.Collections.Array();
