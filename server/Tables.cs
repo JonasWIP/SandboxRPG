@@ -109,4 +109,17 @@ public static partial class Module
         public uint Health;
         public uint MaxHealth;
     }
+
+    /// <summary>Singleton terrain configuration. Always has exactly one row (Id = 0).
+    /// Clients subscribe and regenerate terrain mesh + collision whenever this changes.</summary>
+    [Table(Name = "terrain_config", Public = true)]
+    public partial struct TerrainConfig
+    {
+        [PrimaryKey]
+        public uint Id;            // always 0
+        public uint Seed;
+        public float WorldSize;    // units (side length of the square world)
+        public float NoiseScale;   // spatial frequency of hills
+        public float NoiseAmplitude; // max height added by noise
+    }
 }
