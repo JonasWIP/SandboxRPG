@@ -176,16 +176,16 @@ public partial class WorldManager : Node3D
 		if (modelPath != null && ResourceLoader.Exists(modelPath))
 		{
 			var model = ResourceLoader.Load<PackedScene>(modelPath).Instantiate<Node3D>();
-			model.Position = new Vector3(0, 0.1f, 0);
+			model.Position = new Vector3(0, 0.25f, 0);
 			body.AddChild(model);
 			var convex = BuildConvexShape(model, 1.0f);
-			Shape3D itemShape = convex.Points.Length > 0 ? convex : new SphereShape3D { Radius = 0.15f };
+			Shape3D itemShape = convex.Points.Length > 0 ? convex : new SphereShape3D { Radius = 0.2f };
 			body.AddChild(new CollisionShape3D { Shape = itemShape });
 		}
 		else
 		{
 			body.AddChild(CreateFallbackItemMesh(item.ItemType));
-			body.AddChild(new CollisionShape3D { Shape = new SphereShape3D { Radius = 0.15f } });
+			body.AddChild(new CollisionShape3D { Shape = new SphereShape3D { Radius = 0.2f } });
 		}
 
 		body.AddChild(new Label3D
@@ -274,6 +274,17 @@ public partial class WorldManager : Node3D
 			TintMeshes(child, color, mat);
 	}
 
+	private static (Vector3 size, Vector3 center) GetStructureBoxShape(string t) => t switch
+	{
+		"wood_wall"   or "stone_wall"  => (new Vector3(2.5f, 2.5f, 0.25f), new Vector3(0, 1.25f, 0)),
+		"wood_floor"  or "stone_floor" => (new Vector3(2.5f, 0.1f,  2.5f),  new Vector3(0, 0.05f, 0)),
+		"wood_door"                    => (new Vector3(2.5f, 2.5f, 0.25f), new Vector3(0, 1.25f, 0)),
+		"campfire"                     => (new Vector3(0.8f, 0.4f,  0.8f),  new Vector3(0, 0.2f,  0)),
+		"workbench"                    => (new Vector3(1.2f, 0.8f,  0.6f),  new Vector3(0, 0.4f,  0)),
+		"chest"                        => (new Vector3(0.8f, 0.6f,  0.6f),  new Vector3(0, 0.3f,  0)),
+		_                              => (new Vector3(1.0f, 1.0f,  1.0f),  new Vector3(0, 0.5f,  0)),
+	};
+
 	// =========================================================================
 	// STRUCTURES
 	// =========================================================================
@@ -314,14 +325,17 @@ public partial class WorldManager : Node3D
 		{
 			var scene  = ResourceLoader.Load<PackedScene>(modelPath);
 			var visual = scene.Instantiate<Node3D>();
-			Color? tint = structure.StructureType switch
-			{
-				"wood_wall" or "wood_floor" or "wood_door" => new Color(0.65f, 0.45f, 0.25f),
-				"stone_wall" or "stone_floor"              => new Color(0.6f,  0.6f,  0.65f),
-				_                                           => (Color?)null,
-			};
-			if (tint.HasValue) TintMeshes(visual, tint.Value);
 			body.AddChild(visual);
+			var convex = BuildConvexShape(visual, 1.0f);
+			if (convex.Points.Length > 0)
+			{
+				body.AddChild(new CollisionShape3D { Shape = convex });
+			}
+			else
+			{
+				var (sz, sc) = GetStructureBoxShape(structure.StructureType);
+				body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = sz }, Position = sc });
+			}
 		}
 		else
 		{
@@ -341,24 +355,9 @@ public partial class WorldManager : Node3D
 			};
 			mesh.Position = new Vector3(0, StructureYOffset(structure.StructureType), 0);
 			body.AddChild(mesh);
+			var (sz, sc) = GetStructureBoxShape(structure.StructureType);
+			body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = sz }, Position = sc });
 		}
-
-		var (shapeSize, shapeCenter) = structure.StructureType switch
-		{
-			"wood_wall"   or "stone_wall"  => (new Vector3(2.5f, 2.5f, 0.25f), new Vector3(0, 1.25f, 0)),
-			"wood_floor"  or "stone_floor" => (new Vector3(2.5f, 0.1f,  2.5f),  new Vector3(0, 0.05f, 0)),
-			"wood_door"                    => (new Vector3(2.5f, 2.5f, 0.25f), new Vector3(0, 1.25f, 0)),
-			"campfire"                     => (new Vector3(0.8f, 0.4f,  0.8f),  new Vector3(0, 0.2f,  0)),
-			"workbench"                    => (new Vector3(1.2f, 0.8f,  0.6f),  new Vector3(0, 0.4f,  0)),
-			"chest"                        => (new Vector3(0.8f, 0.6f,  0.6f),  new Vector3(0, 0.3f,  0)),
-			_                              => (new Vector3(1.0f, 1.0f,  1.0f),  new Vector3(0, 0.5f,  0)),
-		};
-		body.AddChild(new CollisionShape3D
-		{
-			Shape    = new BoxShape3D { Size = shapeSize },
-			Position = shapeCenter,
-		});
-
 		body.Position = new Vector3(structure.PosX, structure.PosY, structure.PosZ);
 		body.Rotation = new Vector3(0, structure.RotY, 0);
 		body.SetMeta("structure_id",  (long)structure.Id);
