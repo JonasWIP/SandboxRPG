@@ -93,4 +93,20 @@ public static partial class Module
         public string Text;
         public ulong Timestamp; // microseconds since epoch
     }
+
+    /// <summary>Harvestable and decorative world objects (trees, rocks, bushes).
+    /// Seeded on Init, deleted when health reaches 0.</summary>
+    [Table(Name = "world_object", Public = true)]
+    public partial struct WorldObject
+    {
+        [AutoInc][PrimaryKey]
+        public ulong Id;
+        public string ObjectType;   // "tree_pine", "rock_large", "rock_small", "tree_dead", "bush"
+        public float PosX;
+        public float PosY;
+        public float PosZ;
+        public float RotY;          // Y-axis rotation in radians
+        public uint Health;
+        public uint MaxHealth;
+    }
 }
