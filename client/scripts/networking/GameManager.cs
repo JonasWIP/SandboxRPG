@@ -54,6 +54,7 @@ public partial class GameManager : Node
 	[Signal] public delegate void StructureChangedEventHandler();
 	[Signal] public delegate void RecipesLoadedEventHandler();
 	[Signal] public delegate void WorldObjectUpdatedEventHandler(long id, bool removed);
+	[Signal] public delegate void TerrainConfigChangedEventHandler();
 
 	// =========================================================================
 	// GODOT LIFECYCLE
@@ -143,6 +144,7 @@ public partial class GameManager : Node
 	public IEnumerable<CraftingRecipe> GetAllRecipes()      { if (Conn != null) foreach (var r in Conn.Db.CraftingRecipe.Iter())   yield return r; }
 	public IEnumerable<WorldObject>    GetAllWorldObjects() { if (Conn != null) foreach (var o in Conn.Db.WorldObject.Iter())      yield return o; }
 	public WorldObject? GetWorldObject(ulong id) => Conn?.Db.WorldObject.Id.Find(id);
+	public TerrainConfig? GetTerrainConfig() => Conn?.Db.TerrainConfig.Id.Find(0);
 
 	// =========================================================================
 	// PRIVATE — CONNECTION IMPLEMENTATION
@@ -261,6 +263,9 @@ public partial class GameManager : Node
 
 		conn.Db.WorldObject.OnInsert += (ctx, o) => CallDeferred(nameof(EmitWorldObjectUpdated), (long)o.Id, false);
 		conn.Db.WorldObject.OnDelete += (ctx, o) => CallDeferred(nameof(EmitWorldObjectUpdated), (long)o.Id, true);
+
+		conn.Db.TerrainConfig.OnInsert += (ctx, _) => CallDeferred(nameof(EmitTerrainConfigChanged));
+		conn.Db.TerrainConfig.OnUpdate += (ctx, _, _) => CallDeferred(nameof(EmitTerrainConfigChanged));
 	}
 
 	// Deferred signal emitters (thread-safe hop back to main thread)
@@ -272,6 +277,7 @@ public partial class GameManager : Node
 	private void EmitStructureChanged()        => EmitSignal(SignalName.StructureChanged);
 	private void EmitRecipesLoaded()           => EmitSignal(SignalName.RecipesLoaded);
 	private void EmitWorldObjectUpdated(long id, bool removed) => EmitSignal(SignalName.WorldObjectUpdated, id, removed);
+	private void EmitTerrainConfigChanged() => EmitSignal(SignalName.TerrainConfigChanged);
 
 	// =========================================================================
 	// AUTH TOKEN PERSISTENCE
