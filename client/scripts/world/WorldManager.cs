@@ -401,28 +401,40 @@ public partial class WorldManager : Node3D
 			_            => null,
 		};
 
+		float modelScale = obj.ObjectType switch
+		{
+			"tree_pine" or "tree_palm" => 2.5f,
+			"tree_dead"                => 2.0f,
+			"rock_large"               => 2.0f,
+			"rock_small"               => 1.8f,
+			"bush"                     => 1.5f,
+			_                          => 1.0f,
+		};
+
 		if (modelPath != null && ResourceLoader.Exists(modelPath))
 		{
-			var scene = ResourceLoader.Load<PackedScene>(modelPath);
-			body.AddChild(scene.Instantiate<Node3D>());
+			var model = ResourceLoader.Load<PackedScene>(modelPath).Instantiate<Node3D>();
+			model.Scale = Vector3.One * modelScale;
+			body.AddChild(model);
 		}
 		else
 		{
 			body.AddChild(new MeshInstance3D
 			{
-				Mesh = new BoxMesh { Size = new Vector3(0.8f, 1.5f, 0.8f) },
-				Position = new Vector3(0, 0.75f, 0),
+				Mesh = new BoxMesh { Size = new Vector3(0.8f, 1.5f, 0.8f) * modelScale },
+				Position = new Vector3(0, 0.75f * modelScale, 0),
 			});
 		}
 
 		// Approximate collision shape per type
 		var shapeSize = obj.ObjectType switch
 		{
-			"tree_pine" or "tree_dead" or "tree_palm" => new Vector3(0.5f, 3f, 0.5f),
-			"rock_large" => new Vector3(1.2f, 0.8f, 1.2f),
-			"rock_small" => new Vector3(0.6f, 0.4f, 0.6f),
-			"bush"       => new Vector3(1f, 0.7f, 1f),
-			_            => new Vector3(0.8f, 1f, 0.8f),
+			"tree_pine" or "tree_palm" => new Vector3(1.2f, 6.0f, 1.2f),
+			"tree_dead"                => new Vector3(1.0f, 5.0f, 1.0f),
+			"rock_large"               => new Vector3(2.4f, 1.6f, 2.4f),
+			"rock_small"               => new Vector3(1.1f, 0.7f, 1.1f),
+			"bush"                     => new Vector3(1.5f, 1.0f, 1.5f),
+			_                          => new Vector3(0.8f, 1.0f, 0.8f),
 		};
 		var collider = new CollisionShape3D
 		{
