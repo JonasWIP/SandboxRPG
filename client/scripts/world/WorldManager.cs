@@ -195,7 +195,7 @@ public partial class WorldManager : Node3D
 			Position    = new Vector3(0, 0.7f, 0),
 		});
 
-		body.Position = new Vector3(item.PosX, item.PosY, item.PosZ);
+		body.Position = new Vector3(item.PosX, item.PosY + 0.5f, item.PosZ);
 		body.SetMeta("world_item_id", (long)item.Id);
 		body.SetMeta("item_type", item.ItemType);
 		return body;
