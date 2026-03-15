@@ -1,4 +1,5 @@
 using SpacetimeDB;
+using System;
 
 namespace SandboxRPG.Server;
 
@@ -15,6 +16,7 @@ public static partial class Module
         Log.Info("SandboxRPG server module initialized!");
         SeedRecipes(ctx);
         SeedWorldItems(ctx);
+        SeedWorldObjects(ctx);
     }
 
     [Reducer(ReducerKind.ClientConnected)]
@@ -37,7 +39,7 @@ public static partial class Module
                 Identity = identity,
                 Name = $"Player_{identity.ToString()[..8]}",
                 PosX = 0f,
-                PosY = 1f,
+                PosY = 0.3f,
                 PosZ = 0f,
                 RotY = 0f,
                 Health = 100f,
@@ -90,12 +92,63 @@ public static partial class Module
 
     private static void SeedWorldItems(ReducerContext ctx)
     {
-        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "wood",  Quantity = 5, PosX =  3f, PosY = 0.5f, PosZ =  3f });
-        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "stone", Quantity = 3, PosX = -4f, PosY = 0.5f, PosZ =  2f });
-        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "wood",  Quantity = 8, PosX =  7f, PosY = 0.5f, PosZ = -5f });
-        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "iron",  Quantity = 2, PosX = -8f, PosY = 0.5f, PosZ = -6f });
-        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "stone", Quantity = 5, PosX = 10f, PosY = 0.5f, PosZ =  8f });
+        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "wood",  Quantity = 5, PosX =  3f, PosY = TerrainHeightAt( 3f,  3f) + 0.2f, PosZ =  3f });
+        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "stone", Quantity = 3, PosX = -4f, PosY = TerrainHeightAt(-4f,  2f) + 0.2f, PosZ =  2f });
+        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "wood",  Quantity = 8, PosX =  7f, PosY = TerrainHeightAt( 7f, -5f) + 0.2f, PosZ = -5f });
+        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "iron",  Quantity = 2, PosX = -8f, PosY = TerrainHeightAt(-8f, -6f) + 0.2f, PosZ = -6f });
+        ctx.Db.WorldItem.Insert(new WorldItem { ItemType = "stone", Quantity = 5, PosX = 10f, PosY = TerrainHeightAt(10f,  8f) + 0.2f, PosZ =  8f });
 
         Log.Info("Seeded starter world items.");
+    }
+
+    /// <summary>Mirrors the client Terrain.HeightAt formula (no Mathf on server).</summary>
+    private static float TerrainHeightAt(float x, float z)
+    {
+        float t = Math.Clamp((z - 5f) / 20f, 0f, 1f);
+        return t * t * (3f - 2f * t) * 4f;   // SmoothStep(0, 4, t)
+    }
+
+    private static void SeedWorldObjects(ReducerContext ctx)
+    {
+        var rng = new Random(42);   // fixed seed — same world every restart
+
+        // Helper: random position in range with terrain-height Y
+        WorldObject MakeObject(string type, float xMin, float xMax, float zMin, float zMax, uint hp)
+        {
+            float x = (float)(rng.NextDouble() * (xMax - xMin) + xMin);
+            float z = (float)(rng.NextDouble() * (zMax - zMin) + zMin);
+            return new WorldObject
+            {
+                ObjectType = type,
+                PosX = x,
+                PosY = TerrainHeightAt(x, z),
+                PosZ = z,
+                RotY = (float)(rng.NextDouble() * Math.PI * 2),
+                Health = hp,
+                MaxHealth = hp,
+            };
+        }
+
+        // Pine trees — inland plateau
+        for (int i = 0; i < 50; i++)
+            ctx.Db.WorldObject.Insert(MakeObject("tree_pine", -40f, 40f, 20f, 48f, 100));
+
+        // Dead trees / stumps — at treeline
+        for (int i = 0; i < 12; i++)
+            ctx.Db.WorldObject.Insert(MakeObject("tree_dead", -30f, 30f, 15f, 25f, 60));
+
+        // Large rocks — scattered beach and hillside
+        for (int i = 0; i < 18; i++)
+            ctx.Db.WorldObject.Insert(MakeObject("rock_large", -40f, 40f, 0f, 30f, 150));
+
+        // Small rocks — scattered everywhere
+        for (int i = 0; i < 15; i++)
+            ctx.Db.WorldObject.Insert(MakeObject("rock_small", -45f, 45f, -5f, 35f, 80));
+
+        // Bushes — near spawn clearing
+        for (int i = 0; i < 10; i++)
+            ctx.Db.WorldObject.Insert(MakeObject("bush", -20f, 20f, 5f, 18f, 30));
+
+        Log.Info("Seeded world objects.");
     }
 }
