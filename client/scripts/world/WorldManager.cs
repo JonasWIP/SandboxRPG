@@ -161,32 +161,21 @@ public partial class WorldManager : Node3D
 
 	private Node3D CreateWorldItemVisual(WorldItem item)
 	{
-		var body = new RigidBody3D
-		{
-			Name             = $"WorldItem_{item.Id}",
-			LinearDamp       = 2.0f,
-			AngularDamp      = 10f,
-			AxisLockAngularX = true,
-			AxisLockAngularY = true,
-			AxisLockAngularZ = true,
-		};
+		var body = new StaticBody3D { Name = $"WorldItem_{item.Id}" };
 
-		// Visual — must be added first so BuildConvexShape can find it
 		var modelPath = WorldItemModelPath(item.ItemType);
 		if (modelPath != null && ResourceLoader.Exists(modelPath))
 		{
 			var model = ResourceLoader.Load<PackedScene>(modelPath).Instantiate<Node3D>();
-			model.Position = new Vector3(0, 0.25f, 0);
+			model.Position = new Vector3(0, 0.1f, 0);
 			body.AddChild(model);
-			var convex = BuildConvexShape(model, 1.0f);
-			Shape3D itemShape = convex.Points.Length > 0 ? convex : new SphereShape3D { Radius = 0.2f };
-			body.AddChild(new CollisionShape3D { Shape = itemShape });
 		}
 		else
 		{
 			body.AddChild(CreateFallbackItemMesh(item.ItemType));
-			body.AddChild(new CollisionShape3D { Shape = new SphereShape3D { Radius = 0.2f } });
 		}
+
+		body.AddChild(new CollisionShape3D { Shape = new SphereShape3D { Radius = 0.2f } });
 
 		body.AddChild(new Label3D
 		{
@@ -194,10 +183,11 @@ public partial class WorldManager : Node3D
 			FontSize    = 32,
 			Billboard   = BaseMaterial3D.BillboardModeEnum.Enabled,
 			NoDepthTest = true,
-			Position    = new Vector3(0, 0.7f, 0),
+			Position    = new Vector3(0, 0.5f, 0),
 		});
 
-		body.Position = new Vector3(item.PosX, item.PosY + 0.5f, item.PosZ);
+		float groundY = Terrain.HeightAt(item.PosX, item.PosZ);
+		body.Position = new Vector3(item.PosX, groundY + 0.1f, item.PosZ);
 		body.SetMeta("world_item_id", (long)item.Id);
 		body.SetMeta("item_type", item.ItemType);
 		return body;
@@ -291,9 +281,9 @@ public partial class WorldManager : Node3D
 
 	private static (Vector3 size, Vector3 center) GetStructureBoxShape(string t) => t switch
 	{
-		"wood_wall"   or "stone_wall"  => (new Vector3(2.5f, 2.0f, 0.25f), new Vector3(0, 1.0f, 0)),
-		"wood_floor"  or "stone_floor" => (new Vector3(2.5f, 0.1f,  2.5f),  new Vector3(0, 0.05f, 0)),
-		"wood_door"                    => (new Vector3(2.5f, 2.0f, 0.25f), new Vector3(0, 1.0f, 0)),
+		"wood_wall"   or "stone_wall"  => (new Vector3(2.0f, 2.0f, 0.25f), new Vector3(0, 1.0f, 0)),
+		"wood_floor"  or "stone_floor" => (new Vector3(2.0f, 0.1f,  2.0f),  new Vector3(0, 0.05f, 0)),
+		"wood_door"                    => (new Vector3(2.0f, 2.0f, 0.25f), new Vector3(0, 1.0f, 0)),
 		"campfire"                     => (new Vector3(0.8f, 0.4f,  0.8f),  new Vector3(0, 0.2f,  0)),
 		"workbench"                    => (new Vector3(1.2f, 0.8f,  0.6f),  new Vector3(0, 0.4f,  0)),
 		"chest"                        => (new Vector3(0.8f, 0.6f,  0.6f),  new Vector3(0, 0.3f,  0)),
@@ -348,16 +338,6 @@ public partial class WorldManager : Node3D
 			};
 			if (tint.HasValue) TintMeshes(visual, tint.Value);
 			body.AddChild(visual);
-			var convex = BuildConvexShape(visual, 1.0f);
-			if (convex.Points.Length > 0)
-			{
-				body.AddChild(new CollisionShape3D { Shape = convex });
-			}
-			else
-			{
-				var (sz, sc) = GetStructureBoxShape(structure.StructureType);
-				body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = sz }, Position = sc });
-			}
 		}
 		else
 		{
@@ -377,9 +357,10 @@ public partial class WorldManager : Node3D
 			};
 			mesh.Position = new Vector3(0, StructureYOffset(structure.StructureType), 0);
 			body.AddChild(mesh);
-			var (sz, sc) = GetStructureBoxShape(structure.StructureType);
-			body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = sz }, Position = sc });
 		}
+
+		var (sz, sc) = GetStructureBoxShape(structure.StructureType);
+		body.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = sz }, Position = sc });
 		body.Position = new Vector3(structure.PosX, structure.PosY, structure.PosZ);
 		body.Rotation = new Vector3(0, structure.RotY, 0);
 		body.SetMeta("structure_id",  (long)structure.Id);

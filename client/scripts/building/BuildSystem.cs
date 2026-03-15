@@ -10,7 +10,7 @@ namespace SandboxRPG;
 /// </summary>
 public partial class BuildSystem : Node
 {
-	[Export] public float GridSize   = 1.0f;
+	[Export] public float GridSize   = 2.0f;
 	[Export] public float PlaceRange = 10.0f;
 
 	private static readonly System.Collections.Generic.HashSet<string> BuildableTypes = new()
