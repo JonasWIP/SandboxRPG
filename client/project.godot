@@ -23,6 +23,7 @@ config/icon="res://icon.svg"
 [autoload]
 
 ModManager="*res://scripts/mods/ModManager.cs"
+HelloWorldClientMod="*res://mods/hello-world/HelloWorldClientMod.cs"
 GameManager="*res://scripts/networking/GameManager.cs"
 SceneRouter="*res://scripts/networking/SceneRouter.cs"
 UIManager="*res://scripts/ui/UIManager.cs"

@@ -1,0 +1,18 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://mods/hello-world/ui/HelloWorldPanel.cs" id="1"]
+
+[node name="HelloWorldPanel" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 320.0
+offset_bottom = 40.0
+script = ExtResource("1")
+
+[node name="Label" type="Label" parent="."]
+layout_mode = 0
+offset_left = 10.0
+offset_top = 8.0
+offset_right = 310.0
+offset_bottom = 36.0
+text = "Hello from HelloWorld Mod!"
