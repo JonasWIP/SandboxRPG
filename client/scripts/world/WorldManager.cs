@@ -413,24 +413,31 @@ public partial class WorldManager : Node3D
 		}
 	}
 
-	/// <summary>Duplicates all surface materials and sets metallic=0 so models use diffuse lighting instead of IBL-only.</summary>
-	private static void FixMaterials(Node root)
+	/// <summary>
+	/// Duplicates surface materials, sets metallic=0 (so diffuse lighting works),
+	/// scales brightness, and optionally replaces Kenney's teal "grass" face colour
+	/// with stone grey (needed for rocks where the top face is painted grass-green).
+	/// </summary>
+	private static void FixMaterials(Node root, float brightness = 0.85f, bool neutralizeGrass = false)
 	{
 		if (root is MeshInstance3D mi && mi.Mesh != null)
 		{
 			for (int surf = 0; surf < mi.Mesh.GetSurfaceCount(); surf++)
 			{
 				var mat = mi.GetActiveMaterial(surf);
-				if (mat is BaseMaterial3D bm)
-				{
-					var dup = (BaseMaterial3D)bm.Duplicate();
-					dup.Metallic = 0f;
-					mi.SetSurfaceOverrideMaterial(surf, dup);
-				}
+				if (mat is not BaseMaterial3D bm) continue;
+				var dup = (BaseMaterial3D)bm.Duplicate();
+				dup.Metallic = 0f;
+				var c = dup.AlbedoColor;
+				// Teal/grass heuristic: low red, high green+blue → stone grey
+				if (neutralizeGrass && c.R < 0.3f && c.G > 0.6f && c.B > 0.5f)
+					c = new Color(0.52f, 0.50f, 0.48f);
+				dup.AlbedoColor = new Color(c.R * brightness, c.G * brightness, c.B * brightness, c.A);
+				mi.SetSurfaceOverrideMaterial(surf, dup);
 			}
 		}
 		foreach (Node child in root.GetChildren())
-			FixMaterials(child);
+			FixMaterials(child, brightness, neutralizeGrass);
 	}
 
 	private static ConvexPolygonShape3D BuildConvexShape(Node3D model, float scale)
@@ -476,7 +483,8 @@ public partial class WorldManager : Node3D
 		{
 			var model = ResourceLoader.Load<PackedScene>(modelPath).Instantiate<Node3D>();
 			model.Scale = Vector3.One * modelScale;
-			FixMaterials(model);
+			bool isRock = obj.ObjectType is "rock_large" or "rock_small";
+			FixMaterials(model, neutralizeGrass: isRock);
 			body.AddChild(model);
 			body.AddChild(new CollisionShape3D { Shape = BuildConvexShape(model, modelScale) });
 		}
