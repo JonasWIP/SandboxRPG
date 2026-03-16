@@ -90,3 +90,7 @@ chat={
 
 anti_aliasing/quality/msaa_3d=2
 environment/defaults/default_clear_color=Color(0.4, 0.6, 0.8, 1)
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/gdUnit4/plugin.cfg")
