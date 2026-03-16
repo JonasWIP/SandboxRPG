@@ -9,8 +9,12 @@
   <ItemGroup>
     <PackageReference Include="SpacetimeDB.Runtime" Version="2.0.*" />
   </ItemGroup>
+  <!-- Exclude the NUnit test sub-project from the WASM build -->
+  <ItemGroup>
+    <Compile Remove="SandboxRPG.Server.Tests/**/*.cs" />
+  </ItemGroup>
   <!-- Mods: add one line per enabled mod -->
   <ItemGroup>
-    <Compile Include="../mods/hello-world/server/**/*.cs" />
+    <Compile Include="../mods/hello-world/server/**/*.cs" Exclude="../mods/hello-world/server/tests/**/*.cs" />
   </ItemGroup>
 </Project>
