@@ -41,6 +41,9 @@ client/.godot/
 client/bin/
 client/obj/
 
+# Exception: GdUnit4 addon runner scripts (committed as part of the addon)
+!client/addons/gdUnit4/bin/
+
 # =============================================
 # Logs / runtime artifacts
 # =============================================
