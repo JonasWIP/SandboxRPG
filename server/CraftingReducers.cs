@@ -73,10 +73,10 @@ public static partial class Module
         {
             ctx.Db.InventoryItem.Insert(new InventoryItem
             {
-                OwnerId = identity,
+                OwnerId  = identity,
                 ItemType = r.ResultItemType,
                 Quantity = r.ResultQuantity,
-                Slot = -1,
+                Slot     = FindOpenHotbarSlot(ctx, identity),
             });
         }
 

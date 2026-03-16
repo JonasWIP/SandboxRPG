@@ -168,7 +168,7 @@ public partial class WorldManager : Node3D
 		{
 			var model = ResourceLoader.Load<PackedScene>(modelPath).Instantiate<Node3D>();
 			model.Position = new Vector3(0, 0.1f, 0);
-			FixMaterials(model);
+			ApplyMaterials(model);
 			body.AddChild(model);
 		}
 		else
@@ -256,28 +256,23 @@ public partial class WorldManager : Node3D
 		_                              => null,
 	};
 
-	/// <summary>Recursively tints MeshInstance3D nodes, duplicating existing materials so textures are preserved.</summary>
-	private static void TintMeshes(Node root, Color color)
+	/// <summary>Recursively processes mesh materials: zeroes metallic, applies color override or dims by 0.85.</summary>
+	private static void ApplyMaterials(Node root, Color? color = null)
 	{
 		if (root is MeshInstance3D mi && mi.Mesh != null)
 		{
 			for (int surf = 0; surf < mi.Mesh.GetSurfaceCount(); surf++)
 			{
-				var existing = mi.GetActiveMaterial(surf);
-				if (existing is BaseMaterial3D baseMat)
-				{
-					var dup = (BaseMaterial3D)baseMat.Duplicate();
-					dup.AlbedoColor = color;
-					mi.SetSurfaceOverrideMaterial(surf, dup);
-				}
-				else
-				{
-					mi.SetSurfaceOverrideMaterial(surf, new StandardMaterial3D { AlbedoColor = color, Roughness = 0.85f });
-				}
+				var mat = mi.GetActiveMaterial(surf);
+				if (mat is not BaseMaterial3D bm) continue;
+				var dup = (BaseMaterial3D)bm.Duplicate();
+				dup.Metallic    = 0f;
+				dup.AlbedoColor = color ?? dup.AlbedoColor * 0.85f;
+				mi.SetSurfaceOverrideMaterial(surf, dup);
 			}
 		}
 		foreach (Node child in root.GetChildren())
-			TintMeshes(child, color);
+			ApplyMaterials(child, color);
 	}
 
 	private static (Vector3 size, Vector3 center) GetStructureBoxShape(string t) => t switch
@@ -335,9 +330,9 @@ public partial class WorldManager : Node3D
 			{
 				"wood_wall" or "wood_floor" or "wood_door" => new Color(1.0f, 0.78f, 0.55f),
 				"stone_wall" or "stone_floor"              => new Color(0.82f, 0.82f, 0.88f),
-				_                                           => (Color?)null,
+				_                                          => null,
 			};
-			if (tint.HasValue) TintMeshes(visual, tint.Value);
+			ApplyMaterials(visual, tint);
 			body.AddChild(visual);
 		}
 		else
@@ -413,25 +408,6 @@ public partial class WorldManager : Node3D
 		}
 	}
 
-	/// <summary>Duplicates surface materials, zeroes metallic (enables diffuse lighting), and dims brightness.</summary>
-	private static void FixMaterials(Node root, float brightness = 0.85f)
-	{
-		if (root is MeshInstance3D mi && mi.Mesh != null)
-		{
-			for (int surf = 0; surf < mi.Mesh.GetSurfaceCount(); surf++)
-			{
-				var mat = mi.GetActiveMaterial(surf);
-				if (mat is not BaseMaterial3D bm) continue;
-				var dup = (BaseMaterial3D)bm.Duplicate();
-				dup.Metallic = 0f;
-				var c = dup.AlbedoColor;
-				dup.AlbedoColor = new Color(c.R * brightness, c.G * brightness, c.B * brightness, c.A);
-				mi.SetSurfaceOverrideMaterial(surf, dup);
-			}
-		}
-		foreach (Node child in root.GetChildren())
-			FixMaterials(child, brightness);
-	}
 
 	private static ConvexPolygonShape3D BuildConvexShape(Node3D model, float scale)
 	{
@@ -476,7 +452,8 @@ public partial class WorldManager : Node3D
 		{
 			var model = ResourceLoader.Load<PackedScene>(modelPath).Instantiate<Node3D>();
 			model.Scale = Vector3.One * modelScale;
-			FixMaterials(model);
+			Color? tint = obj.ObjectType is "rock_large" or "rock_small" ? new Color(0.6f, 0.6f, 0.6f) : null;
+			ApplyMaterials(model, tint);
 			body.AddChild(model);
 			body.AddChild(new CollisionShape3D { Shape = BuildConvexShape(model, modelScale) });
 		}

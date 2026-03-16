@@ -217,7 +217,17 @@ public partial class InventoryCraftingPanel : BasePanel
         var col = UIFactory.MakeVBox(4);
         popup.AddChild(col);
 
-        // Assign to hotbar slot header
+        // Build slot → itemType map for occupied slot indicators
+        var occupiedSlots = new Dictionary<int, string>();
+        foreach (var inv in GameManager.Instance.GetMyInventory())
+            if (inv.Slot >= 0 && inv.Slot < Hotbar.SlotCount)
+                occupiedSlots[inv.Slot] = inv.ItemType;
+
+        // Find current slot of this item
+        int currentSlot = -1;
+        foreach (var inv in GameManager.Instance.GetMyInventory())
+            if (inv.Id == itemId) { currentSlot = inv.Slot; break; }
+
         col.AddChild(UIFactory.MakeLabel("Assign to slot:", 11, UIFactory.ColourMuted));
 
         var slotRow = UIFactory.MakeHBox(4);
@@ -225,8 +235,16 @@ public partial class InventoryCraftingPanel : BasePanel
 
         for (int s = 0; s < Hotbar.SlotCount; s++)
         {
-            int slot = s; // capture
+            int slot = s;
+            bool isCurrent  = slot == currentSlot;
+            bool isOccupied = occupiedSlots.ContainsKey(slot) && !isCurrent;
+
             var slotBtn = UIFactory.MakeButton($"{s + 1}", 12, new Vector2(28, 28));
+            if (isCurrent)
+                slotBtn.Modulate = UIFactory.ColourAccent;
+            else if (isOccupied)
+                slotBtn.Modulate = new Color(1f, 0.6f, 0.3f); // orange = occupied (will swap)
+
             slotBtn.Pressed += () =>
             {
                 GameManager.Instance.MoveItemSlot(itemId, slot);

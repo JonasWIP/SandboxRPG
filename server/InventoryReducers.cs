@@ -44,10 +44,10 @@ public static partial class Module
         {
             ctx.Db.InventoryItem.Insert(new InventoryItem
             {
-                OwnerId = ctx.Sender,
+                OwnerId  = ctx.Sender,
                 ItemType = item.ItemType,
                 Quantity = item.Quantity,
-                Slot = -1,
+                Slot     = FindOpenHotbarSlot(ctx, ctx.Sender),
             });
         }
 
@@ -89,13 +89,28 @@ public static partial class Module
     [Reducer]
     public static void MoveItemToSlot(ReducerContext ctx, ulong inventoryItemId, int slot)
     {
-        if (slot < -1 || slot > 8) return;
+        if (slot < -1 || slot >= 8) return;
 
         var invItem = ctx.Db.InventoryItem.Id.Find(inventoryItemId);
         if (invItem is null) return;
 
         var item = invItem.Value;
         if (item.OwnerId != ctx.Sender) return;
+
+        // If another item already occupies the target slot, swap it to this item's old slot
+        if (slot >= 0)
+        {
+            foreach (var other in ctx.Db.InventoryItem.Iter())
+            {
+                if (other.OwnerId == ctx.Sender && other.Id != inventoryItemId && other.Slot == slot)
+                {
+                    var displaced = other;
+                    displaced.Slot = item.Slot;
+                    ctx.Db.InventoryItem.Id.Update(displaced);
+                    break;
+                }
+            }
+        }
 
         item.Slot = slot;
         ctx.Db.InventoryItem.Id.Update(item);
@@ -104,6 +119,18 @@ public static partial class Module
     // =========================================================================
     // SHARED HELPERS
     // =========================================================================
+
+    /// <summary>Returns the first hotbar slot (0–7) not occupied by this player, or -1 if all full.</summary>
+    internal static int FindOpenHotbarSlot(ReducerContext ctx, SpacetimeDB.Identity owner)
+    {
+        var used = new bool[8];
+        foreach (var inv in ctx.Db.InventoryItem.Iter())
+            if (inv.OwnerId == owner && inv.Slot >= 0 && inv.Slot < 8)
+                used[inv.Slot] = true;
+        for (int i = 0; i < 8; i++)
+            if (!used[i]) return i;
+        return -1;
+    }
 
     /// <summary>Parses "wood:4,stone:2" ingredient strings into typed tuples.</summary>
     internal static List<(string itemType, uint quantity)> ParseIngredients(string ingredients)

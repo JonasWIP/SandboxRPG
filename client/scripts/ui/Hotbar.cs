@@ -42,6 +42,7 @@ public partial class Hotbar : Control
 
         GameManager.Instance.InventoryChanged += Refresh;
         GameManager.Instance.SubscriptionApplied += Refresh;
+        Refresh();
     }
 
     public override void _ExitTree()
