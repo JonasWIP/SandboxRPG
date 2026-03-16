@@ -134,16 +134,5 @@ public static partial class Module
 
     /// <summary>Parses "wood:4,stone:2" ingredient strings into typed tuples.</summary>
     internal static List<(string itemType, uint quantity)> ParseIngredients(string ingredients)
-    {
-        var result = new List<(string, uint)>();
-        if (string.IsNullOrEmpty(ingredients)) return result;
-
-        foreach (var part in ingredients.Split(','))
-        {
-            var kv = part.Trim().Split(':');
-            if (kv.Length == 2 && uint.TryParse(kv[1], out uint qty))
-                result.Add((kv[0].Trim(), qty));
-        }
-        return result;
-    }
+        => InventoryHelpers.ParseIngredients(ingredients);
 }
