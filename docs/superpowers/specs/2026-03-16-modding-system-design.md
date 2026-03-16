@@ -8,7 +8,7 @@
 
 ## Overview
 
-A compile-time modding system that allows new game content to be developed in self-contained modules. Mods live in a top-level `mods/` folder, register themselves with zero changes to core files, and are enabled by adding a single line to the server `.csproj` and ensuring client scripts are discoverable by Godot. Mods can declare dependencies on other mods; the loader seeds them in dependency order.
+A compile-time modding system that allows new game content to be developed in self-contained modules. Mods are enabled by adding a single `.csproj` glob include for the server; client mod scripts live under `client/mods/` and are auto-discovered by Godot. Mods register themselves with zero changes to core game files. They can declare dependencies on other mods; the loader seeds them in dependency order.
 
 Target mods (future sessions): `currency`, `shop` (depends on currency), `casino` (depends on currency).
 
@@ -16,9 +16,10 @@ Target mods (future sessions): `currency`, `shop` (depends on currency), `casino
 
 ## Constraints
 
-- **SpacetimeDB compiles to a single WASM module** — mods cannot be loaded/unloaded at runtime. Enable/disable is compile-time only (include/exclude files from the build).
-- **No reflection in WASM** — mod discovery uses static constructor self-registration, not assembly scanning.
-- **Godot scans all project files** — client mod scripts placed under `client/mods/` are automatically compiled into the game.
+- **SpacetimeDB compiles to a single WASM module** — mods cannot be loaded/unloaded at runtime. Enable/disable is compile-time only.
+- **All SpacetimeDB tables and reducers must be nested inside `public static partial class Module`** in `namespace SandboxRPG.Server`. Mod table and reducer files follow this same pattern.
+- **No reflection in WASM** — mod registration uses a static field initializer on `Module`, which is guaranteed to run before the `Init` reducer.
+- **Godot scans all scripts under `client/`** — client mod scripts placed under `client/mods/<mod-name>/` are automatically compiled.
 
 ---
 
@@ -27,38 +28,46 @@ Target mods (future sessions): `currency`, `shop` (depends on currency), `casino
 ```
 mods/
 └── hello-world/
-    ├── mod.json                          # metadata
-    ├── server/
-    │   ├── HelloWorldMod.cs              # IMod + self-registration
-    │   ├── HelloWorldTables.cs           # [Table] definitions
-    │   └── HelloWorldReducers.cs         # [Reducer] definitions
-    └── client/
-        ├── HelloWorldClientMod.cs        # IClientMod + self-registration
+    ├── mod.json                          # human-readable metadata only
+    └── server/
+        ├── HelloWorldMod.cs              # IMod nested class + static field registration
+        ├── HelloWorldTables.cs           # [Table] definitions (inside partial class Module)
+        └── HelloWorldReducers.cs         # [Reducer] definitions (inside partial class Module)
+
+client/
+└── mods/
+    └── hello-world/
+        ├── HelloWorldClientMod.cs        # IClientMod + static field registration
         └── ui/
             ├── HelloWorldPanel.tscn
             └── HelloWorldPanel.cs
+```
 
+Core mod system files (part of the base game, not a mod):
+```
 server/mods/
-    ├── IMod.cs                           # server mod interface
-    └── ModLoader.cs                      # registration + dependency-ordered seeding
+    ├── IMod.cs         # server mod interface
+    └── ModLoader.cs    # Register(), RunAll(ctx) with dependency sort
 
 client/scripts/mods/
-    ├── IClientMod.cs                     # client mod interface
-    └── ModManager.cs                     # Godot autoload singleton
+    ├── IClientMod.cs   # client mod interface
+    └── ModManager.cs   # Godot autoload singleton
 ```
 
 ---
 
 ## Enabling a Mod
 
-**Server** — add one line to `server/StdbModule.csproj`:
+**Server** — add one line to `server/StdbModule.csproj` inside the `<ItemGroup>`:
 ```xml
 <Compile Include="../mods/hello-world/server/**/*.cs" />
 ```
 
-**Client** — Godot automatically compiles scripts under `client/mods/`. The `ModManager` autoload must be registered once in `project.godot` (permanent, not per-mod).
+**Client** — no `.csproj` change needed. Godot auto-compiles all `.cs` files under `client/`. Client mod scripts at `client/mods/hello-world/` are discovered automatically.
 
-**Disabling** — remove the `.csproj` line and rebuild. Client scripts under `client/mods/<mod>/` can be left in place (they do nothing if not registered) or deleted.
+**After enabling** — if the mod adds tables or reducers, regenerate client bindings (see Bindings section).
+
+**Disabling** — remove the `.csproj` line, remove or leave the `client/mods/<mod>/` folder, rebuild.
 
 ---
 
@@ -66,6 +75,8 @@ client/scripts/mods/
 
 ```csharp
 // server/mods/IMod.cs
+using SpacetimeDB;
+
 namespace SandboxRPG.Server.Mods;
 
 public interface IMod
@@ -83,6 +94,11 @@ public interface IMod
 
 ```csharp
 // server/mods/ModLoader.cs
+using SpacetimeDB;
+using System.Collections.Generic;
+using System.Linq;
+using SandboxRPG.Server.Mods;
+
 namespace SandboxRPG.Server.Mods;
 
 public static class ModLoader
@@ -100,86 +116,148 @@ public static class ModLoader
         }
     }
 
-    // Kahn's algorithm — throws if circular dependency detected
-    private static IEnumerable<IMod> TopoSort(List<IMod> mods) { ... }
+    // Kahn's algorithm. Throws InvalidOperationException on circular dependency.
+    // Unknown dependency names (mods not in the registered list) are ignored.
+    private static IEnumerable<IMod> TopoSort(List<IMod> mods)
+    {
+        var nameToMod = mods.ToDictionary(m => m.Name);
+        var inDegree = mods.ToDictionary(m => m.Name, _ => 0);
+
+        foreach (var mod in mods)
+            foreach (var dep in mod.Dependencies)
+                if (nameToMod.ContainsKey(dep))
+                    inDegree[mod.Name]++;
+
+        var queue = new Queue<IMod>(mods.Where(m => inDegree[m.Name] == 0));
+        var result = new List<IMod>();
+
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            result.Add(current);
+            foreach (var dependent in mods.Where(m => m.Dependencies.Contains(current.Name)))
+            {
+                inDegree[dependent.Name]--;
+                if (inDegree[dependent.Name] == 0)
+                    queue.Enqueue(dependent);
+            }
+        }
+
+        if (result.Count != mods.Count)
+            throw new InvalidOperationException("[ModLoader] Circular dependency detected in mods.");
+
+        return result;
+    }
 }
 ```
 
 **One permanent addition to `Lifecycle.cs` Init:**
 ```csharp
-ModLoader.RunAll(ctx);
+[Reducer(ReducerKind.Init)]
+public static void Init(ReducerContext ctx)
+{
+    // ... existing seed calls ...
+    ModLoader.RunAll(ctx);  // ← added once, never touched again
+}
 ```
 
 ---
 
-## Server: Mod Self-Registration Pattern
+## Server: Registration Pattern
 
+SpacetimeDB calls into `Module` before running any reducer. This guarantees that any static field initializer on `partial class Module` fires before `Init`. Mods exploit this by declaring a `private static readonly` field on `Module` that instantiates their `IMod` class — whose constructor calls `ModLoader.Register(this)`.
+
+**`HelloWorldMod.cs`:**
 ```csharp
-// mods/hello-world/server/HelloWorldMod.cs
-namespace SandboxRPG.Server.Mods.HelloWorld;
+using SpacetimeDB;
+using SandboxRPG.Server.Mods;
 
-public class HelloWorldMod : IMod
+namespace SandboxRPG.Server;
+
+// partial class Module ensures registration fires before Init
+public static partial class Module
 {
-    static HelloWorldMod() => ModLoader.Register(new HelloWorldMod());
+    private static readonly HelloWorldModImpl _helloWorldMod = new();
 
-    public string Name => "hello-world";
-    public string Version => "1.0.0";
-    public string[] Dependencies => Array.Empty<string>();
-
-    public void Seed(ReducerContext ctx)
+    private sealed class HelloWorldModImpl : IMod
     {
-        ctx.Db.CraftingRecipe.Insert(new CraftingRecipe
-        {
-            ResultItemType = "hello_item",
-            ResultQuantity = 1,
-            Ingredients = "wood:1",
-            CraftTimeSeconds = 1f,
-        });
+        public HelloWorldModImpl() => ModLoader.Register(this);
 
-        Log.Info("[HelloWorldMod] Seeded.");
+        public string Name => "hello-world";
+        public string Version => "1.0.0";
+        public string[] Dependencies => System.Array.Empty<string>();
+
+        public void Seed(ReducerContext ctx)
+        {
+            ctx.Db.CraftingRecipe.Insert(new CraftingRecipe
+            {
+                ResultItemType = "hello_item",
+                ResultQuantity = 1,
+                Ingredients = "wood:1",
+                CraftTimeSeconds = 1f,
+            });
+            Log.Info("[HelloWorldMod] Seeded.");
+        }
     }
 }
 ```
-
-The `static HelloWorldMod()` constructor fires when the class is first touched at startup, registering the mod before `Init` runs.
 
 ---
 
 ## Server: Hello World Table & Reducer
 
+All table and reducer definitions must be nested inside `partial class Module` in `namespace SandboxRPG.Server` — the same pattern as every other server file.
+
+**`HelloWorldTables.cs`:**
 ```csharp
-// mods/hello-world/server/HelloWorldTables.cs
-[Table(Name = "hello_world_message", Public = true)]
-public partial struct HelloWorldMessage
+using SpacetimeDB;
+
+namespace SandboxRPG.Server;
+
+public static partial class Module
 {
-    [PrimaryKey]
-    public Identity PlayerId;
-    public string Message;
+    /// <summary>One greeting row per player. Owned by hello-world mod.</summary>
+    [Table(Name = "hello_world_message", Public = true)]
+    public partial struct HelloWorldMessage
+    {
+        [PrimaryKey]
+        public Identity PlayerId;
+        public string Message;
+    }
 }
 ```
 
+**`HelloWorldReducers.cs`:**
 ```csharp
-// mods/hello-world/server/HelloWorldReducers.cs
-[Reducer]
-public static void SayHello(ReducerContext ctx, string message)
+using SpacetimeDB;
+
+namespace SandboxRPG.Server;
+
+public static partial class Module
 {
-    var existing = ctx.Db.HelloWorldMessage.PlayerId.Find(ctx.Sender);
-    if (existing is not null)
+    [Reducer]
+    public static void SayHello(ReducerContext ctx, string message)
     {
-        var row = existing.Value;
-        row.Message = message;
-        ctx.Db.HelloWorldMessage.PlayerId.Update(row);
-    }
-    else
-    {
-        ctx.Db.HelloWorldMessage.Insert(new HelloWorldMessage
+        var existing = ctx.Db.HelloWorldMessage.PlayerId.Find(ctx.Sender);
+        if (existing is not null)
         {
-            PlayerId = ctx.Sender,
-            Message = message,
-        });
+            var row = existing.Value;
+            row.Message = message;
+            ctx.Db.HelloWorldMessage.PlayerId.Update(row);
+        }
+        else
+        {
+            ctx.Db.HelloWorldMessage.Insert(new HelloWorldMessage
+            {
+                PlayerId = ctx.Sender,
+                Message = message,
+            });
+        }
     }
 }
 ```
+
+Note: `HelloWorldMessage` uses `Identity PlayerId` as `[PrimaryKey]` (not `[AutoInc]`) because there is exactly one greeting per player identity.
 
 ---
 
@@ -187,6 +265,8 @@ public static void SayHello(ReducerContext ctx, string message)
 
 ```csharp
 // client/scripts/mods/IClientMod.cs
+namespace SandboxRPG;
+
 public interface IClientMod
 {
     string ModName { get; }
@@ -200,15 +280,22 @@ public interface IClientMod
 
 ```csharp
 // client/scripts/mods/ModManager.cs
+using Godot;
+using System.Collections.Generic;
+
+namespace SandboxRPG;
+
 public partial class ModManager : Node
 {
     public static ModManager Instance { get; private set; }
     private static readonly List<IClientMod> _pending = new();
 
+    // Called before _Ready — safe for mods to register here
     public static void Register(IClientMod mod) => _pending.Add(mod);
 
     public override void _Ready() => Instance = this;
 
+    /// <summary>Called from WorldManager._Ready once the game scene is fully loaded.</summary>
     public void InitializeAll(Node sceneRoot)
     {
         foreach (var mod in _pending)
@@ -220,33 +307,77 @@ public partial class ModManager : Node
 }
 ```
 
-`InitializeAll(this)` is called from the main game scene (e.g. `WorldManager._Ready`) once the scene tree is ready.
+`ModManager` is registered as a Godot autoload in `project.godot` (one-time setup). `InitializeAll(this)` is called from `WorldManager._Ready()` — this is the earliest point where the full game scene tree exists and HUD panels can be safely added as children.
 
 ---
 
 ## Client: Hello World Mod
 
+**`HelloWorldClientMod.cs`** — placed at `client/mods/hello-world/HelloWorldClientMod.cs`:
 ```csharp
-// mods/hello-world/client/HelloWorldClientMod.cs
+using Godot;
+
+namespace SandboxRPG;
+
 public class HelloWorldClientMod : IClientMod
 {
+    // Runs when the type is loaded by Godot's C# compiler at startup
     static HelloWorldClientMod() => ModManager.Register(new HelloWorldClientMod());
 
     public string ModName => "hello-world";
 
     public void Initialize(Node sceneRoot)
     {
-        var panel = GD.Load<PackedScene>("res://mods/hello-world/client/ui/HelloWorldPanel.tscn").Instantiate();
+        var panel = GD.Load<PackedScene>("res://mods/hello-world/ui/HelloWorldPanel.tscn").Instantiate();
         sceneRoot.AddChild(panel);
     }
 }
 ```
 
-`HelloWorldPanel.cs` subscribes to the `HelloWorldMessage` table via `GameManager` signals and displays the greeting in a HUD label. On connect it calls `Reducers.SayHello("Hello from HelloWorld Mod!")`.
+Note: `res://` is relative to `client/` (Godot's project root), so `client/mods/hello-world/ui/HelloWorldPanel.tscn` maps to `res://mods/hello-world/ui/HelloWorldPanel.tscn`.
+
+**`HelloWorldPanel.cs`** — code-behind for the `.tscn` scene, attached as the root script:
+```csharp
+using Godot;
+
+namespace SandboxRPG;
+
+public partial class HelloWorldPanel : Control
+{
+    private Label _label;
+
+    public override void _Ready()
+    {
+        _label = GetNode<Label>("Label");
+        _label.Text = "Hello from HelloWorld Mod!";
+
+        // Subscribe to table updates via GameManager's Conn
+        var conn = GameManager.Instance.Conn;
+        conn.Db.HelloWorldMessage.OnInsert += (_, row) => OnMessageInsertOrUpdate(row);
+        conn.Db.HelloWorldMessage.OnUpdate += (_, _, row) => OnMessageInsertOrUpdate(row);
+
+        // Send greeting once connected
+        if (GameManager.Instance.IsConnected)
+            Reducers.SayHello("Hello from HelloWorld Mod!");
+        else
+            GameManager.Instance.Connected += () => Reducers.SayHello("Hello from HelloWorld Mod!");
+    }
+
+    private void OnMessageInsertOrUpdate(HelloWorldMessage row)
+    {
+        if (row.PlayerId == GameManager.Instance.LocalIdentity)
+            _label.Text = row.Message;
+    }
+}
+```
+
+Client mods subscribe directly to `GameManager.Instance.Conn.Db.<Table>` events — no changes to `GameManager.cs` required.
 
 ---
 
 ## mod.json Schema
+
+`mod.json` is **human-readable metadata only** — it is not parsed at runtime. The authoritative registration is the static field/constructor pattern above. It exists to document intent and dependency relationships.
 
 ```json
 {
@@ -258,13 +389,13 @@ public class HelloWorldClientMod : IClientMod
 }
 ```
 
-Future mods declare deps: `"dependencies": ["currency"]`.
+Future mods with dependencies: `"dependencies": ["currency"]`.
 
 ---
 
 ## Bindings Regeneration
 
-After enabling a new mod that adds tables or reducers, regenerate client bindings:
+After enabling a mod that adds `[Table]` or `[Reducer]` definitions, regenerate client bindings:
 
 ```bash
 cd server && spacetime generate --lang csharp \
@@ -272,7 +403,7 @@ cd server && spacetime generate --lang csharp \
   --bin-path bin/Release/net8.0/wasi-wasm/AppBundle/StdbModule.wasm
 ```
 
-This is required any time a mod adds a `[Table]` or `[Reducer]`.
+This is required for `conn.Db.HelloWorldMessage` and `Reducers.SayHello` to exist in the generated code.
 
 ---
 
@@ -280,7 +411,7 @@ This is required any time a mod adds a `[Table]` or `[Reducer]`.
 
 | Mod | Depends On | Adds |
 |---|---|---|
-| `currency` | — | `Currency` table on Player, coin item types, mint/spend reducers |
+| `currency` | — | `Currency` fields on Player, coin item types, earn/spend reducers |
 | `shop` | `currency` | `ShopNpc`, `ShopInventory` tables, buy/sell reducers, NPC scene |
 | `casino` | `currency` | `CasinoGame` table, bet reducers, slot machine scene |
 
@@ -292,3 +423,4 @@ This is required any time a mod adds a `[Table]` or `[Reducer]`.
 - Community/external modding (internal only for now)
 - Inter-mod event buses (add when needed)
 - Mod settings UI (add when needed)
+- `mod.json` validation tooling (add if mod count grows large)
