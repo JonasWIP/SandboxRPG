@@ -161,7 +161,7 @@ public partial class WorldManager : Node3D
 
 	private Node3D CreateWorldItemVisual(WorldItem item)
 	{
-		var body = new StaticBody3D { Name = $"WorldItem_{item.Id}" };
+		var body = new StaticBody3D { Name = $"WorldItem_{item.Id}", CollisionLayer = 2, CollisionMask = 0 };
 
 		var modelPath = WorldItemModelPath(item.ItemType);
 		if (modelPath != null && ResourceLoader.Exists(modelPath))
@@ -281,9 +281,9 @@ public partial class WorldManager : Node3D
 
 	private static (Vector3 size, Vector3 center) GetStructureBoxShape(string t) => t switch
 	{
-		"wood_wall"   or "stone_wall"  => (new Vector3(2.0f, 2.0f, 0.25f), new Vector3(0, 1.0f, 0)),
-		"wood_floor"  or "stone_floor" => (new Vector3(2.0f, 0.1f,  2.0f),  new Vector3(0, 0.05f, 0)),
-		"wood_door"                    => (new Vector3(2.0f, 2.0f, 0.25f), new Vector3(0, 1.0f, 0)),
+		"wood_wall"   or "stone_wall"  => (new Vector3(0.25f, 2.4f, 2.0f), new Vector3(0, 1.2f, 0)),
+		"wood_floor"  or "stone_floor" => (new Vector3(2.0f,  0.1f, 2.0f), new Vector3(0, 0.05f, 0)),
+		"wood_door"                    => (new Vector3(0.25f, 2.4f, 2.0f), new Vector3(0, 1.2f, 0)),
 		"campfire"                     => (new Vector3(0.8f, 0.4f,  0.8f),  new Vector3(0, 0.2f,  0)),
 		"workbench"                    => (new Vector3(1.2f, 0.8f,  0.6f),  new Vector3(0, 0.4f,  0)),
 		"chest"                        => (new Vector3(0.8f, 0.6f,  0.6f),  new Vector3(0, 0.3f,  0)),

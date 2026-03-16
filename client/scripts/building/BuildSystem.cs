@@ -88,7 +88,7 @@ public partial class BuildSystem : Node
 		var hitPos = (Vector3)result["position"];
 		hitPos.X = Mathf.Round(hitPos.X / GridSize) * GridSize;
 		hitPos.Z = Mathf.Round(hitPos.Z / GridSize) * GridSize;
-		hitPos.Y = Mathf.Snapped(hitPos.Y, 0.25f);
+		hitPos.Y = Mathf.Snapped(hitPos.Y, 0.4f);
 
 		if (_ghostPreview == null) CreateGhostPreview(_currentGhostType!);
 		if (_ghostPreview == null) return;
