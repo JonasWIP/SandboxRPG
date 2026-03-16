@@ -101,10 +101,10 @@ public partial class BuildSystem : Node
 	{
 		_ghostPreview = new Node3D { Name = "GhostPreview" };
 
-		var modelPath = WorldManager.StructureModelPath(structureType);
+		var modelPath = StructureSpawner.StructureModelPath(structureType);
 		if (modelPath != null && ResourceLoader.Exists(modelPath))
 		{
-			var model = ResourceLoader.Load<PackedScene>(modelPath).Instantiate<Node3D>();
+			var model = ModelRegistry.Get(modelPath)!.Instantiate<Node3D>();
 			ApplyGhostMaterial(model);
 			_ghostPreview.AddChild(model);
 		}
@@ -112,14 +112,14 @@ public partial class BuildSystem : Node
 		{
 			var mesh = new MeshInstance3D
 			{
-				Mesh             = WorldManager.StructureFallbackMesh(structureType),
+				Mesh             = StructureSpawner.StructureFallbackMesh(structureType),
 				MaterialOverride = new StandardMaterial3D
 				{
 					AlbedoColor  = new Color(0.3f, 0.8f, 0.3f, 0.4f),
 					Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
 				},
 			};
-			mesh.Position = new Vector3(0, WorldManager.StructureYOffset(structureType), 0);
+			mesh.Position = new Vector3(0, StructureSpawner.StructureYOffset(structureType), 0);
 			_ghostPreview.AddChild(mesh);
 		}
 
