@@ -1,5 +1,6 @@
 using SpacetimeDB;
 using System;
+using SandboxRPG.Server.Mods;
 
 namespace SandboxRPG.Server;
 
@@ -24,6 +25,7 @@ public static partial class Module
         SeedRecipes(ctx);
         SeedWorldItems(ctx);
         SeedWorldObjects(ctx);
+        ModLoader.RunAll(ctx);
     }
 
     [Reducer(ReducerKind.ClientConnected)]

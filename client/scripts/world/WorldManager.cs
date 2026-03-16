@@ -31,6 +31,8 @@ public partial class WorldManager : Node3D
 
         if (gm.IsConnected && gm.GetLocalPlayer() != null)
             OnSubscriptionApplied();
+
+        ModManager.Instance.InitializeAll(this);
     }
 
     private void OnSubscriptionApplied()
