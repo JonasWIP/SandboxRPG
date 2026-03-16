@@ -37,9 +37,14 @@ All files live in `client/scripts/world/`:
 Thin coordinator. Creates spawner instances in `_Ready()`, wires GameManager
 signals to spawner methods. Holds no entity dictionaries itself.
 
+The existing `_worldSpawned` guard (prevents double-fire when `SubscriptionApplied`
+fires while already connected) stays in `WorldManager` as a `bool _worldSpawned`
+field on the coordinator:
+
 ```csharp
 public partial class WorldManager : Node3D
 {
+    private bool _worldSpawned;
     private PlayerSpawner _players;
     private WorldItemSpawner _items;
     private StructureSpawner _structures;
@@ -66,6 +71,8 @@ public partial class WorldManager : Node3D
 
     private void OnSubscriptionApplied()
     {
+        if (_worldSpawned) return;
+        _worldSpawned = true;
         _players.SpawnAll();
         _items.Sync();
         _structures.Sync();
@@ -78,24 +85,33 @@ public partial class WorldManager : Node3D
 
 Static class. Owns the PackedScene cache and `ApplyMaterials`.
 
+`Get()` returns `null` if the path does not exist — callers must guard with
+`ResourceLoader.Exists(path)` before calling `Get()`, exactly as the current
+code does. This preserves the existing fallback-mesh logic in each spawner.
+
 ```csharp
 public static class ModelRegistry
 {
     private static readonly Dictionary<string, PackedScene> _cache = new();
 
-    public static PackedScene Get(string path)
+    // Returns null if path does not exist — caller must check ResourceLoader.Exists() first.
+    public static PackedScene? Get(string path)
     {
         if (!_cache.TryGetValue(path, out var scene))
             _cache[path] = scene = ResourceLoader.Load<PackedScene>(path);
         return scene;
     }
 
+    /// <summary>Recursively processes mesh materials: zeroes metallic, applies
+    /// color override or dims albedo by 0.85.</summary>
     public static void ApplyMaterials(Node root, Color? color = null) { ... }
 }
 ```
 
-All spawners call `ModelRegistry.Get(path).Instantiate<Node3D>()` instead of
-`ResourceLoader.Load<PackedScene>(path).Instantiate<Node3D>()`.
+All spawners and `BuildSystem` call `ModelRegistry.Get(path)!.Instantiate<Node3D>()`
+after an `ResourceLoader.Exists()` guard, replacing direct `ResourceLoader.Load` calls.
+`BuildSystem.CreateGhostPreview` also currently calls `ResourceLoader.Load` directly
+(line ~107) and must be updated to use `ModelRegistry.Get` for consistency.
 
 ### Spawner Classes
 
@@ -108,30 +124,57 @@ public XxxSpawner(Node3D parent, GameManager gm)
 - `parent` — used for `parent.AddChild(node)`
 - `gm` — used for `gm.GetAll*()`, `gm.GetLocalPlayer()`, etc.
 
-Each spawner owns its own entity dictionary (`Dictionary<ulong, Node3D>` or
-equivalent).
+**PlayerSpawner** specific notes:
+- Entity dict is `Dictionary<string, RemotePlayer>` (keyed by identity hex string),
+  not `Dictionary<ulong, Node3D>`, because remote players are identified by string identity.
+- Creates `new PlayerController { Name = "LocalPlayer" }` then calls `parent.AddChild()`.
+  `PlayerController` is a `CharacterBody3D` that self-initialises in `_Ready`/`_EnterTree`
+  — no further setup needed from the spawner beyond setting position, rotation, and color.
+- Uses `PlayerPrefs.LoadColorHex()` as a fallback color in two places (local player spawn
+  and local player color update). `PlayerPrefs` is a static class — no wiring needed.
+
+**StructureSpawner** entity dict is `Dictionary<ulong, StaticBody3D>` (not `Node3D`)
+because `CreateStructureVisual` returns `StaticBody3D` and callers rely on this type.
+
+**WorldObjectSpawner** entity dict is `Dictionary<ulong, Node3D>`.
+
+**WorldItemSpawner** entity dict is `Dictionary<ulong, Node3D>`.
 
 ### BuildSystem.cs compatibility
 
-`BuildSystem` currently calls `WorldManager.StructureFallbackMesh`,
-`WorldManager.StructureModelPath`, and `WorldManager.StructureYOffset`.
-These move to `StructureSpawner` as `public static` methods. Call sites in
-`BuildSystem.cs` are updated accordingly (3 references).
+`BuildSystem` currently calls three static methods on `WorldManager`:
+- `WorldManager.StructureFallbackMesh` (line ~104)
+- `WorldManager.StructureModelPath` (line ~115)
+- `WorldManager.StructureYOffset` (line ~122)
+
+These move to `StructureSpawner` as `public static` methods. All three call sites
+in `BuildSystem.cs` are updated to `StructureSpawner.*`. No other files reference
+these methods.
+
+`BuildSystem` also calls `ResourceLoader.Load<PackedScene>(modelPath)` directly
+(line ~107). This is updated to use `ModelRegistry.Get(modelPath)` for consistency
+with the rest of the codebase.
 
 ## Data Flow
 
 ```
 GameManager signals
-    SubscriptionApplied  → _players.SpawnAll()
+    SubscriptionApplied  → _players.SpawnAll()    (spawns local + all online remote players)
                          → _items.Sync()
                          → _structures.Sync()
-                         → _worldObjects.SyncAll()
+                         → _worldObjects.SyncAll() (iterates GetAllWorldObjects(), adds missing)
     PlayerUpdated(id)    → _players.OnUpdated(id)
     PlayerRemoved(id)    → _players.OnRemoved(id)
     WorldItemChanged     → _items.Sync()
     StructureChanged     → _structures.Sync()
     WorldObjectUpdated   → _worldObjects.OnUpdated(id, removed)
+                           (delta: removes node if removed=true, adds new if removed=false)
 ```
+
+`SyncAll()` on `WorldObjectSpawner` mirrors the existing `OnWorldObjectsChanged()`:
+iterates `gm.GetAllWorldObjects()`, creates visuals for any IDs not yet in the dict.
+It does NOT remove objects (world objects are only removed via `OnWorldObjectUpdated`
+with `removed=true`).
 
 ## Optimisation
 
