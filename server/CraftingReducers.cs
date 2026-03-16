@@ -56,14 +56,29 @@ public static partial class Module
             }
         }
 
-        // Award crafted item
-        ctx.Db.InventoryItem.Insert(new InventoryItem
+        // Award crafted item — stack with existing slot if possible
+        bool stacked = false;
+        foreach (var invItem in ctx.Db.InventoryItem.Iter())
         {
-            OwnerId = identity,
-            ItemType = r.ResultItemType,
-            Quantity = r.ResultQuantity,
-            Slot = -1,
-        });
+            if (invItem.OwnerId == identity && invItem.ItemType == r.ResultItemType)
+            {
+                var updated = invItem;
+                updated.Quantity += r.ResultQuantity;
+                ctx.Db.InventoryItem.Id.Update(updated);
+                stacked = true;
+                break;
+            }
+        }
+        if (!stacked)
+        {
+            ctx.Db.InventoryItem.Insert(new InventoryItem
+            {
+                OwnerId = identity,
+                ItemType = r.ResultItemType,
+                Quantity = r.ResultQuantity,
+                Slot = -1,
+            });
+        }
 
         Log.Info($"Player crafted {r.ResultQuantity}x {r.ResultItemType}");
     }

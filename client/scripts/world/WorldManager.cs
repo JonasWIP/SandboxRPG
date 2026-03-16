@@ -332,8 +332,8 @@ public partial class WorldManager : Node3D
 			var visual = scene.Instantiate<Node3D>();
 			Color? tint = structure.StructureType switch
 			{
-				"wood_wall" or "wood_floor" or "wood_door" => new Color(0.65f, 0.45f, 0.25f),
-				"stone_wall" or "stone_floor"              => new Color(0.6f,  0.6f,  0.65f),
+				"wood_wall" or "wood_floor" or "wood_door" => new Color(1.0f, 0.78f, 0.55f),
+				"stone_wall" or "stone_floor"              => new Color(0.82f, 0.82f, 0.88f),
 				_                                           => (Color?)null,
 			};
 			if (tint.HasValue) TintMeshes(visual, tint.Value);
