@@ -413,12 +413,8 @@ public partial class WorldManager : Node3D
 		}
 	}
 
-	/// <summary>
-	/// Duplicates surface materials, sets metallic=0 (so diffuse lighting works),
-	/// scales brightness, and optionally replaces Kenney's teal "grass" face colour
-	/// with stone grey (needed for rocks where the top face is painted grass-green).
-	/// </summary>
-	private static void FixMaterials(Node root, float brightness = 0.85f, bool neutralizeGrass = false)
+	/// <summary>Duplicates surface materials, zeroes metallic (enables diffuse lighting), and dims brightness.</summary>
+	private static void FixMaterials(Node root, float brightness = 0.85f)
 	{
 		if (root is MeshInstance3D mi && mi.Mesh != null)
 		{
@@ -429,15 +425,12 @@ public partial class WorldManager : Node3D
 				var dup = (BaseMaterial3D)bm.Duplicate();
 				dup.Metallic = 0f;
 				var c = dup.AlbedoColor;
-				// Teal/grass heuristic: low red, high green+blue → stone grey
-				if (neutralizeGrass && c.R < 0.3f && c.G > 0.6f && c.B > 0.5f)
-					c = new Color(0.52f, 0.50f, 0.48f);
 				dup.AlbedoColor = new Color(c.R * brightness, c.G * brightness, c.B * brightness, c.A);
 				mi.SetSurfaceOverrideMaterial(surf, dup);
 			}
 		}
 		foreach (Node child in root.GetChildren())
-			FixMaterials(child, brightness, neutralizeGrass);
+			FixMaterials(child, brightness);
 	}
 
 	private static ConvexPolygonShape3D BuildConvexShape(Node3D model, float scale)
@@ -483,8 +476,7 @@ public partial class WorldManager : Node3D
 		{
 			var model = ResourceLoader.Load<PackedScene>(modelPath).Instantiate<Node3D>();
 			model.Scale = Vector3.One * modelScale;
-			bool isRock = obj.ObjectType is "rock_large" or "rock_small";
-			FixMaterials(model, neutralizeGrass: isRock);
+			FixMaterials(model);
 			body.AddChild(model);
 			body.AddChild(new CollisionShape3D { Shape = BuildConvexShape(model, modelScale) });
 		}
