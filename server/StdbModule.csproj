@@ -9,4 +9,8 @@
   <ItemGroup>
     <PackageReference Include="SpacetimeDB.Runtime" Version="2.0.*" />
   </ItemGroup>
+  <!-- Mods: add one line per enabled mod -->
+  <ItemGroup>
+    <Compile Include="../mods/hello-world/server/**/*.cs" />
+  </ItemGroup>
 </Project>

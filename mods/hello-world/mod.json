@@ -1,0 +1,7 @@
+{
+  "name": "hello-world",
+  "version": "1.0.0",
+  "description": "Template mod — copy and rename to create a new mod.",
+  "dependencies": [],
+  "author": "internal"
+}
