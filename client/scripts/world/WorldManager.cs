@@ -168,6 +168,7 @@ public partial class WorldManager : Node3D
 		{
 			var model = ResourceLoader.Load<PackedScene>(modelPath).Instantiate<Node3D>();
 			model.Position = new Vector3(0, 0.1f, 0);
+			FixMaterials(model);
 			body.AddChild(model);
 		}
 		else
@@ -412,6 +413,26 @@ public partial class WorldManager : Node3D
 		}
 	}
 
+	/// <summary>Duplicates all surface materials and sets metallic=0 so models use diffuse lighting instead of IBL-only.</summary>
+	private static void FixMaterials(Node root)
+	{
+		if (root is MeshInstance3D mi && mi.Mesh != null)
+		{
+			for (int surf = 0; surf < mi.Mesh.GetSurfaceCount(); surf++)
+			{
+				var mat = mi.GetActiveMaterial(surf);
+				if (mat is BaseMaterial3D bm)
+				{
+					var dup = (BaseMaterial3D)bm.Duplicate();
+					dup.Metallic = 0f;
+					mi.SetSurfaceOverrideMaterial(surf, dup);
+				}
+			}
+		}
+		foreach (Node child in root.GetChildren())
+			FixMaterials(child);
+	}
+
 	private static ConvexPolygonShape3D BuildConvexShape(Node3D model, float scale)
 	{
 		var pts = new List<Vector3>();
@@ -455,6 +476,7 @@ public partial class WorldManager : Node3D
 		{
 			var model = ResourceLoader.Load<PackedScene>(modelPath).Instantiate<Node3D>();
 			model.Scale = Vector3.One * modelScale;
+			FixMaterials(model);
 			body.AddChild(model);
 			body.AddChild(new CollisionShape3D { Shape = BuildConvexShape(model, modelScale) });
 		}
