@@ -27,18 +27,7 @@ public static partial class Module
         if (foundItem is null)
             throw new Exception($"You don't have a {structureType} to place.");
 
-        float maxHealth = structureType switch
-        {
-            "wood_wall"   => 100f,
-            "stone_wall"  => 250f,
-            "wood_floor"  => 80f,
-            "stone_floor" => 200f,
-            "wood_door"   => 60f,
-            "campfire"    => 50f,
-            "workbench"   => 100f,
-            "chest"       => 80f,
-            _             => 100f,
-        };
+        float maxHealth = StructureConfig.GetMaxHealth(structureType);
 
         ctx.Db.PlacedStructure.Insert(new PlacedStructure
         {
