@@ -5,7 +5,7 @@
 [ext_resource type="Script" path="res://mods/base/building/BuildSystem.cs" id="3_build"]
 [ext_resource type="Script" path="res://mods/base/ui/ChatUI.cs" id="4_chat"]
 [ext_resource type="Script" path="res://mods/base/ui/HUD.cs" id="5_hud"]
-[ext_resource type="Script" path="res://mods/base/world/Terrain.cs" id="6_terrain"]
+[ext_resource type="Script" path="res://scripts/world/Terrain.cs" id="6_terrain"]
 [ext_resource type="Shader" path="res://assets/shaders/terrain_blend.gdshader" id="7_shader"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMat_terrain"]
