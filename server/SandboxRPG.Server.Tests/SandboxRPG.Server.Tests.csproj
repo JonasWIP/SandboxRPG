@@ -16,7 +16,7 @@
   <ItemGroup>
     <!-- Pure helper files only — NOT the SpacetimeDB-dependent originals -->
     <Compile Include="../mods/ModLoaderHelpers.cs" />
-    <Compile Include="../InventoryHelpers.cs" />
+    <Compile Include="../../mods/base/server/InventoryHelpers.cs" />
     <!-- Hello-world constants (no SpacetimeDB) -->
     <Compile Include="../../mods/hello-world/server/HelloWorldConstants.cs" />
     <!-- Per-mod test files (glob picks up all future mods automatically) -->
