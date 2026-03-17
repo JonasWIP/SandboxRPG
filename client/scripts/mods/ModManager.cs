@@ -1,14 +1,15 @@
 // client/scripts/mods/ModManager.cs
 using Godot;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace SandboxRPG;
 
 /// <summary>
 /// Autoload singleton. Client mods call ModManager.Register(this) from their _Ready.
-/// WorldManager._Ready() calls InitializeAll(this) once the game scene is fully loaded.
-/// Autoloads execute _Ready before scene nodes, so all mods are registered before
-/// WorldManager.InitializeAll is called.
+/// WorldManager._Ready() calls InitializeAll(this) once the game scene is ready.
+/// Mods are initialised in dependency order (topological sort on Dependencies).
 /// </summary>
 public partial class ModManager : Node
 {
@@ -26,10 +27,42 @@ public partial class ModManager : Node
         if (_initialized) return;
         _initialized = true;
 
-        foreach (var mod in _pending)
+        var sorted = TopoSort(_pending);
+        foreach (var mod in sorted)
         {
             GD.Print($"[ModManager] Initializing: {mod.ModName}");
             mod.Initialize(sceneRoot);
         }
+    }
+
+    private static List<IClientMod> TopoSort(List<IClientMod> mods)
+    {
+        var byName   = mods.ToDictionary(m => m.ModName);
+        var inDegree = mods.ToDictionary(m => m.ModName, _ => 0);
+
+        foreach (var mod in mods)
+            foreach (var dep in mod.Dependencies)
+                if (byName.ContainsKey(dep))
+                    inDegree[mod.ModName]++;
+
+        var queue  = new Queue<IClientMod>(mods.Where(m => inDegree[m.ModName] == 0));
+        var result = new List<IClientMod>();
+
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            result.Add(current);
+            foreach (var dependent in mods.Where(m => m.Dependencies.Contains(current.ModName)))
+            {
+                inDegree[dependent.ModName]--;
+                if (inDegree[dependent.ModName] == 0)
+                    queue.Enqueue(dependent);
+            }
+        }
+
+        if (result.Count != mods.Count)
+            throw new InvalidOperationException("[ModManager] Circular dependency detected in client mods.");
+
+        return result;
     }
 }
