@@ -15,6 +15,7 @@
   </ItemGroup>
   <!-- Mods: add one line per enabled mod -->
   <ItemGroup>
+    <Compile Include="../mods/base/server/**/*.cs" />
     <Compile Include="../mods/hello-world/server/**/*.cs" Exclude="../mods/hello-world/server/tests/**/*.cs" />
   </ItemGroup>
 </Project>
