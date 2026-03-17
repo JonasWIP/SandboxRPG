@@ -5,6 +5,7 @@ namespace SandboxRPG;
 
 public interface IClientMod
 {
-    string ModName { get; }
-    void Initialize(Node sceneRoot);
+    string   ModName      { get; }
+    string[] Dependencies { get; }  // mod names that must Initialize before this one
+    void     Initialize(Node sceneRoot);
 }

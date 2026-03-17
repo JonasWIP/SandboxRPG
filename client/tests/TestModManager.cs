@@ -14,8 +14,9 @@ public partial class TestModManager
     /// </summary>
     private sealed partial class StubMod : Godot.Node, IClientMod
     {
-        public string ModName { get; }          // assigned in constructor below — valid C# 6+
-        public bool   WasInitialized { get; private set; }
+        public string   ModName { get; }          // assigned in constructor below — valid C# 6+
+        public string[] Dependencies => System.Array.Empty<string>();
+        public bool     WasInitialized { get; private set; }
 
         public StubMod(string name) { ModName = name; }
 

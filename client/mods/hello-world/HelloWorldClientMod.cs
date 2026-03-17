@@ -11,6 +11,7 @@ namespace SandboxRPG;
 public partial class HelloWorldClientMod : Node, IClientMod
 {
     public string ModName => "hello-world";
+    public string[] Dependencies => System.Array.Empty<string>();
 
     public override void _Ready()
     {
