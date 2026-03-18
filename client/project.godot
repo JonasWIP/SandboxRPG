@@ -28,6 +28,7 @@ HelloWorldClientMod="*res://mods/hello-world/HelloWorldClientMod.cs"
 InteractablesClientMod="*res://mods/interactables/InteractablesClientMod.cs"
 CurrencyClientMod="*res://mods/currency/CurrencyClientMod.cs"
 GameManager="*res://scripts/networking/GameManager.cs"
+NpcsClientMod="*res://mods/npcs/NpcsClientMod.cs"
 SceneRouter="*res://scripts/networking/SceneRouter.cs"
 UIManager="*res://scripts/ui/UIManager.cs"
 
