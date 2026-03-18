@@ -80,6 +80,8 @@ public static partial class Module
         /// <summary>Ingredients as "item:qty,item:qty" — parsed by ParseIngredients().</summary>
         public string Ingredients;
         public float CraftTimeSeconds;
+        /// <summary>Station required to craft. Empty string = craftable anywhere.</summary>
+        public string Station;
     }
 
     /// <summary>Chat message log. Appended on SendChat, never deleted.</summary>

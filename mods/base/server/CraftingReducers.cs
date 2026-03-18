@@ -10,7 +10,7 @@ public static partial class Module
     // =========================================================================
 
     [Reducer]
-    public static void CraftItem(ReducerContext ctx, ulong recipeId)
+    public static void CraftItem(ReducerContext ctx, ulong recipeId, string station)
     {
         var recipe = ctx.Db.CraftingRecipe.Id.Find(recipeId);
         if (recipe is null) throw new Exception("Recipe not found.");
@@ -18,6 +18,10 @@ public static partial class Module
         var r = recipe.Value;
         var identity = ctx.Sender;
         var ingredients = ParseIngredients(r.Ingredients);
+
+        // Station check
+        if (!string.IsNullOrEmpty(r.Station) && r.Station != station)
+            throw new Exception($"This recipe requires a {r.Station}.");
 
         // Verify player has all required ingredients
         foreach (var (itemType, needed) in ingredients)
