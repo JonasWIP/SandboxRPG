@@ -39,7 +39,7 @@ public interface IInteractable
 ### Refactored InteractionSystem
 
 - Still raycast-based, still checks collision layers.
-- Instead of checking meta tags, checks if the collider (or its parent) implements `IInteractable`.
+- Instead of checking meta tags, walks up from the collider via `GetParent()` (max 3 levels) until finding a node that implements `IInteractable`, or returns null.
 - Priority order: `IInteractable` on Layer 2 (items) > `IInteractable` on Layer 1 (objects/structures).
 - Existing behaviors become `IInteractable` implementations:
   - `WorldItemPickup` — wraps current "E to pick up" logic.
@@ -107,14 +107,25 @@ The inventory grid logic from `InventoryCraftingPanel` is extracted into a reusa
 **Location:** Engine-level, `server/AccessControl.cs`
 
 ```csharp
-[Table(Name = "access_control", Public = true)]
-public partial struct AccessControl
+// All table structs must be nested inside partial class Module (SpacetimeDB requirement).
+// server/AccessControl.cs
+public static partial class Module
 {
-    [AutoInc][PrimaryKey] public ulong Id;
-    public ulong EntityId;        // references PlacedStructure/WorldObject ID
-    public string EntityTable;    // "placed_structure" or "world_object"
-    public Identity OwnerId;      // who placed/created it
-    public bool IsPublic;         // default: true
+    public static class EntityTables
+    {
+        public const string PlacedStructure = "placed_structure";
+        public const string WorldObject = "world_object";
+    }
+
+    [Table(Name = "access_control", Public = true)]
+    public partial struct AccessControl
+    {
+        [AutoInc][PrimaryKey] public ulong Id;
+        public ulong EntityId;        // references PlacedStructure/WorldObject ID
+        public string EntityTable;    // EntityTables.PlacedStructure or EntityTables.WorldObject
+        public Identity OwnerId;      // who placed/created it
+        public bool IsPublic;         // default: true
+    }
 }
 ```
 
@@ -146,15 +157,19 @@ public partial struct AccessControl
 **Location:** Engine-level, `server/ContainerSystem.cs`
 
 ```csharp
-[Table(Name = "container_slot", Public = true)]
-public partial struct ContainerSlot
+// server/ContainerSystem.cs
+public static partial class Module
 {
-    [AutoInc][PrimaryKey] public ulong Id;
-    public ulong ContainerId;     // references PlacedStructure or WorldObject ID
-    public string ContainerTable; // "placed_structure" or "world_object"
-    public int Slot;              // 0-based slot index
-    public string ItemType;
-    public uint Quantity;
+    [Table(Name = "container_slot", Public = true)]
+    public partial struct ContainerSlot
+    {
+        [AutoInc][PrimaryKey] public ulong Id;
+        public ulong ContainerId;     // references PlacedStructure or WorldObject ID
+        public string ContainerTable; // EntityTables.PlacedStructure or EntityTables.WorldObject
+        public int Slot;              // 0-based slot index
+        public string ItemType;
+        public uint Quantity;
+    }
 }
 ```
 
@@ -166,13 +181,13 @@ ContainerConfig.Register("furnace_input", slotCount: 1);
 ContainerConfig.Register("furnace_output", slotCount: 1);
 ```
 
-Mods register container types during `Seed()`.
+Mods register container types during `Seed()`. This is an in-memory static dictionary (like `HarvestConfig` and `StructureConfig`), repopulated on every server startup via `Seed()`.
 
 ### Engine Reducers
 
-- `ContainerDeposit(ctx, containerId, containerTable, inventoryItemId, toSlot)` — player inventory -> container slot.
-- `ContainerWithdraw(ctx, containerId, containerTable, fromSlot)` — container -> player inventory.
-- `ContainerTransfer(ctx, containerId, containerTable, fromSlot, toSlot)` — move within container.
+- `ContainerDeposit(ctx, containerId, containerTable, inventoryItemId, toSlot, quantity)` — move `quantity` items from player inventory -> container slot. If the target slot holds the same item type, stacks are merged (up to max). If the target slot holds a different item type, the call is rejected. If `quantity` exceeds the source stack, the call is rejected.
+- `ContainerWithdraw(ctx, containerId, containerTable, fromSlot, quantity)` — move `quantity` items from container -> player inventory. Creates a new `InventoryItem` row or merges into an existing stack.
+- `ContainerTransfer(ctx, containerId, containerTable, fromSlot, toSlot)` — move within container (swaps if target occupied with different type, merges if same type).
 
 All three check access control before executing.
 
@@ -206,11 +221,13 @@ Player presses E on chest
 
 - **Server:** Registers as container with 16 slots. On placement, creates `ContainerSlot` rows + `AccessControl` row (public by default).
 - **Client:** Implements `IInteractable` -> hint "[E] Open Chest". `Interact()` pushes `ContainerPanel`. Owner sees lock/unlock toggle.
+- **Placement hook:** `PlaceStructure` reducer is extended with a post-placement hook registry (`PlacementHooks`), keyed by structure type. The interactables mod registers hooks so that placing a "chest" auto-creates 16 `ContainerSlot` rows + 1 `AccessControl` row.
 
 ### Crafting Table
 
-- **Server:** Registers bonus recipes (Station = "crafting_table"). `CraftingRecipe` table gets a new `string Station` field (empty = anywhere, "crafting_table" = only at station).
-- **Client:** Implements `IInteractable` -> hint "[E] Use Crafting Table". `Interact()` pushes an `InteractionPanel` showing all recipes including table-only ones.
+- **Server:** `CraftingRecipe` table gets a new `string Station` field (default `""` = craftable anywhere, `"crafting_table"` = only at station). The existing `CraftItem` reducer gains a new `string station` parameter. If a recipe has `Station != ""`, the reducer checks that `station` matches. Existing recipes keep `Station = ""` and work as before.
+- **Client:** Implements `IInteractable` -> hint "[E] Use Crafting Table". `Interact()` pushes a `CraftingTablePanel` (extends `InteractionPanel`) that calls `CraftItem(ctx, recipeName, "crafting_table")`. The panel shows all recipes including table-only ones. The regular inventory crafting panel passes `""` as station, so table-only recipes appear greyed out or hidden.
+- **Station context:** The client tracks "currently interacting with" state. When a `CraftingTablePanel` is open, crafting calls include the station type. When closed, station resets to `""`.
 
 ### Furnace
 
@@ -226,9 +243,10 @@ Player presses E on chest
       public bool Complete;
   }
   ```
-- **Reducers:** `FurnaceStartSmelt(ctx, structureId)` — checks input, sets timer. `FurnaceCollect(ctx, structureId)` — if complete, moves result to output/inventory.
-- **Client:** `FurnacePanel` — inventory left, right shows input slot, output slot, progress bar. Progress from `StartTimeMs + DurationMs` vs current time.
-- **Smelt recipes:** Registered by mod (e.g. "raw_iron" -> "iron_ingot", 10s). Separate from crafting recipes.
+- **Reducers:** `FurnaceStartSmelt(ctx, structureId)` — checks input slot, looks up smelt recipe, sets `FurnaceState` with start time and duration. Input slot is locked while smelting (deposits rejected). `FurnaceCollect(ctx, structureId)` — checks if `currentTime >= StartTimeMs + DurationMs`, moves result to output slot or player inventory, clears `FurnaceState`. `FurnaceCancelSmelt(ctx, structureId)` — returns input item, clears state.
+- **Timer model:** SpacetimeDB has no server-side scheduled callbacks. Completion is checked on-demand when any player calls `FurnaceCollect`. The client computes progress locally from `StartTimeMs + DurationMs` vs current time for the progress bar. A furnace stays in "Complete" state until collected — no timeout.
+- **Client:** `FurnacePanel` — inventory left, right shows input slot, output slot, and progress bar.
+- **Smelt recipes:** Registered by mod in a `SmeltConfig` runtime registry (e.g. "raw_iron" -> "iron_ingot", 10s). Separate from crafting recipes.
 
 ### Sign
 
@@ -242,7 +260,7 @@ Player presses E on chest
   }
   ```
 - **Reducer:** `UpdateSignText(ctx, structureId, text)` — access-controlled, max 200 chars.
-- **Client:** Implements `IInteractable` -> hint "[E] Read Sign". `SignPanel` extends `BasePanel` directly (no inventory side). Shows text; owner gets editable field + save. `Label3D` above sign shows first line.
+- **Client:** Implements `IInteractable` -> hint "[E] Read Sign". `SignPanel` extends `BasePanel` directly (no inventory side). Shows text; owner gets editable field + save. `Label3D` above sign shows first line. The sign uses a custom `.tscn` scene (via `StructureDef.ScenePath`) that includes the `Label3D` node, which the spawner populates from `SignText` table data.
 
 ---
 
@@ -283,6 +301,39 @@ Registered as `CraftingRecipe` rows (Station = "" — craftable anywhere):
 
 ---
 
+## 7. Structure Lifecycle Hooks
+
+### Problem
+
+`PlaceStructure` and `RemoveStructure` reducers are in the base mod. Interactable objects need post-placement setup (create container slots, access control rows) and pre-removal cleanup (delete associated rows). Without hooks, every mod would need to duplicate or modify these reducers.
+
+### Solution: Static Hook Registries
+
+**Location:** Engine-level, `server/StructureHooks.cs`
+
+```csharp
+public static partial class Module
+{
+    public static class StructureHooks
+    {
+        // Called after PlaceStructure inserts the row
+        public static void RegisterOnPlace(string structureType, Action<ReducerContext, PlacedStructure> hook);
+        // Called before RemoveStructure deletes the row
+        public static void RegisterOnRemove(string structureType, Action<ReducerContext, PlacedStructure> hook);
+    }
+}
+```
+
+- `PlaceStructure` reducer calls `StructureHooks.RunOnPlace(ctx, newStructure)` after inserting the row.
+- `RemoveStructure` reducer calls `StructureHooks.RunOnRemove(ctx, structure)` before deleting the row.
+- The interactables mod registers hooks during `Seed()`:
+  - Chest placement: creates 16 `ContainerSlot` rows + 1 `AccessControl` row.
+  - Chest removal: deletes all `ContainerSlot` rows and `AccessControl` row for that entity.
+  - Furnace placement/removal: same pattern for input/output containers + `FurnaceState`.
+  - Sign removal: deletes `SignText` row.
+
+---
+
 ## File Layout Summary
 
 ### Engine (core infrastructure)
@@ -297,8 +348,9 @@ client/scripts/ui/
   ContainerGrid.cs              # reusable container slot grid
 
 server/
-  AccessControl.cs              # table + helper + reducer
-  ContainerSystem.cs            # table + config + reducers
+  AccessControl.cs              # table + helper + reducer (partial class Module)
+  ContainerSystem.cs            # table + config + reducers (partial class Module)
+  StructureHooks.cs             # placement/removal hook registry (partial class Module)
 ```
 
 ### Interactables Mod
