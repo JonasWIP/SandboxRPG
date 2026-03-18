@@ -65,6 +65,8 @@ public class WorldObjectSpawner
             Name = $"WorldObject_{obj.Id}",
             WorldObjectId = obj.Id,
             ObjectType = obj.ObjectType,
+            Health = obj.Health,
+            MaxHealth = obj.MaxHealth,
         };
         float scale = def?.Scale ?? 1.0f;
 
