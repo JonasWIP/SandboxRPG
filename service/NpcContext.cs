@@ -1,7 +1,5 @@
 // service/NpcContext.cs
-// NOTE: requires generated bindings — Player type comes from SpacetimeDB.Types
-// TODO: uncomment when bindings are generated:
-// using SpacetimeDB.Types;
+using SpacetimeDB.Types;
 
 namespace SandboxRPG.Service;
 
@@ -32,8 +30,7 @@ public class NpcContext
     public bool HasWanderTarget { get; set; }
 
     // World access
-    // TODO: replace IPlayerData with Player (SpacetimeDB.Types) when bindings are generated
-    public Func<IEnumerable<IPlayerData>> GetPlayers { get; set; } = () => Enumerable.Empty<IPlayerData>();
+    public Func<IEnumerable<Player>> GetPlayers { get; set; } = () => Enumerable.Empty<Player>();
 
     // Reducer calls
     public Action<ulong, float, float, float, float> MoveNpc { get; set; } = (_, _, _, _, _) => { };
@@ -49,14 +46,4 @@ public class NpcContext
     }
 
     public float DistanceToSpawn() => DistanceTo(SpawnPosX, SpawnPosZ);
-}
-
-// TODO: remove this placeholder interface when bindings are generated.
-// This is a stand-in for the generated SpacetimeDB Player type.
-public interface IPlayerData
-{
-    bool IsOnline { get; }
-    float PosX { get; }
-    float PosZ { get; }
-    string IdentityHex { get; }
 }

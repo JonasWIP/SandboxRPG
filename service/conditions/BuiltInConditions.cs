@@ -1,6 +1,5 @@
 // service/conditions/BuiltInConditions.cs
-// NOTE: requires generated bindings — Player type comes from SpacetimeDB.Types
-// TODO: replace IPlayerData with Player (SpacetimeDB.Types) when bindings are generated
+using SpacetimeDB.Types;
 
 namespace SandboxRPG.Service;
 

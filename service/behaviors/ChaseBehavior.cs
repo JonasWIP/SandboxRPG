@@ -1,6 +1,5 @@
 // service/behaviors/ChaseBehavior.cs
-// NOTE: requires generated bindings — Player type comes from SpacetimeDB.Types
-// TODO: replace IPlayerData with Player (SpacetimeDB.Types) when bindings are generated
+using SpacetimeDB.Types;
 
 namespace SandboxRPG.Service;
 
@@ -20,7 +19,7 @@ public class ChaseBehavior : INpcBehavior
             foreach (var p in ctx.GetPlayers())
             {
                 if (!p.IsOnline) continue;
-                if (p.IdentityHex == ctx.TargetIdentityHex)
+                if (p.Identity.ToString() == ctx.TargetIdentityHex)
                 {
                     tx = p.PosX; tz = p.PosZ; found = true; break;
                 }

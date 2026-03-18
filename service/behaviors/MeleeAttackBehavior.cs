@@ -1,6 +1,5 @@
 // service/behaviors/MeleeAttackBehavior.cs
-// NOTE: requires generated bindings — Player type comes from SpacetimeDB.Types
-// TODO: replace IPlayerData with Player (SpacetimeDB.Types) when bindings are generated
+using SpacetimeDB.Types;
 
 namespace SandboxRPG.Service;
 
@@ -20,7 +19,7 @@ public class MeleeAttackBehavior : INpcBehavior
             float dist = ctx.DistanceTo(p.PosX, p.PosZ);
             if (dist <= ctx.Config.AttackRange)
             {
-                ctx.DealDamageToPlayer(ctx.NpcId, p.IdentityHex, ctx.Config.AttackDamage, "melee");
+                ctx.DealDamageToPlayer(ctx.NpcId, p.Identity.ToString(), ctx.Config.AttackDamage, "melee");
                 ctx.LastAttackMs = nowMs;
                 return;
             }
