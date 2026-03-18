@@ -22,10 +22,10 @@ public static partial class Module
         var cfg = FindNpcConfig(ctx, npc.NpcType);
         if (cfg is null || !cfg.Value.IsTrader) return;
 
-        // Range check (5.0 units)
+        // Range check (10.0 units — lenient since trade panel is already open)
         float dx = p.PosX - npc.PosX;
         float dz = p.PosZ - npc.PosZ;
-        if (dx * dx + dz * dz > 5.0f * 5.0f) return;
+        if (dx * dx + dz * dz > 10.0f * 10.0f) return;
 
         // Find trade offer
         NpcTradeOffer? offer = null;
@@ -94,30 +94,33 @@ public static partial class Module
     [Reducer]
     public static void NpcSellItem(ReducerContext ctx, ulong npcId, ulong inventoryItemId, uint quantity)
     {
+        Log.Info($"[NpcSellItem] Called: npcId={npcId}, itemId={inventoryItemId}, qty={quantity}, sender={ctx.Sender}");
+
         var player = ctx.Db.Player.Identity.Find(ctx.Sender);
-        if (player is null) return;
+        if (player is null) { Log.Warn("[NpcSellItem] Player not found"); return; }
         var p = player.Value;
 
         var npcRow = ctx.Db.Npc.Id.Find(npcId);
-        if (npcRow is null) return;
+        if (npcRow is null) { Log.Warn($"[NpcSellItem] NPC {npcId} not found"); return; }
         var npc = npcRow.Value;
 
-        if (!npc.IsAlive) return;
+        if (!npc.IsAlive) { Log.Warn("[NpcSellItem] NPC not alive"); return; }
 
         var cfg = FindNpcConfig(ctx, npc.NpcType);
-        if (cfg is null || !cfg.Value.IsTrader) return;
+        if (cfg is null || !cfg.Value.IsTrader) { Log.Warn("[NpcSellItem] NPC not a trader"); return; }
 
         // Range check
         float dx = p.PosX - npc.PosX;
         float dz = p.PosZ - npc.PosZ;
-        if (dx * dx + dz * dz > 5.0f * 5.0f) return;
+        float distSq = dx * dx + dz * dz;
+        if (distSq > 10.0f * 10.0f) { Log.Warn($"[NpcSellItem] Out of range: {distSq}"); return; }
 
         // Find the inventory item
         var itemRow = ctx.Db.InventoryItem.Id.Find(inventoryItemId);
-        if (itemRow is null) return;
+        if (itemRow is null) { Log.Warn($"[NpcSellItem] Item {inventoryItemId} not found"); return; }
         var item = itemRow.Value;
-        if (item.OwnerId != ctx.Sender) return;
-        if (quantity > item.Quantity || quantity == 0) return;
+        if (item.OwnerId != ctx.Sender) { Log.Warn("[NpcSellItem] Not item owner"); return; }
+        if (quantity > item.Quantity || quantity == 0) { Log.Warn($"[NpcSellItem] Bad qty: {quantity} vs {item.Quantity}"); return; }
 
         // Calculate sell price (half of buy price if the item is in trade offers, otherwise 1 coin per item)
         int pricePerUnit = 1;

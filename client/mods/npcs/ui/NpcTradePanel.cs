@@ -149,7 +149,12 @@ public partial class NpcTradePanel : BasePanel
 
             var sellBtn = UIFactory.MakeButton("Sell", 11, new Vector2(50, 24));
             ulong itemId = item.Id;
-            sellBtn.Pressed += () => GameManager.Instance.SellItemToNpc(_npcId, itemId, 1);
+            string dbgName = displayName;
+            sellBtn.Pressed += () =>
+            {
+                GD.Print($"[NpcTradePanel] Selling itemId={itemId} ({dbgName}) to npc={_npcId}");
+                GameManager.Instance.SellItemToNpc(_npcId, itemId, 1);
+            };
             row.AddChild(sellBtn);
         }
     }
