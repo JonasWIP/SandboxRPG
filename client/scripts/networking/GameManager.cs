@@ -109,7 +109,7 @@ public partial class GameManager : Node
 	public void SendChatMessage(string text)  => Conn?.Reducers.SendChat(text);
 	public void PickupWorldItem(ulong id)     => Conn?.Reducers.PickupItem(id);
 	public void DropInventoryItem(ulong id, uint qty) => Conn?.Reducers.DropItem(id, qty);
-	public void CraftRecipe(ulong id)         => Conn?.Reducers.CraftItem(id);
+	public void CraftRecipe(ulong id, string station = "") => Conn?.Reducers.CraftItem(id, station);
 	public void PlaceBuildStructure(string type, float x, float y, float z, float rotY) => Conn?.Reducers.PlaceStructure(type, x, y, z, rotY);
 	public void RemoveBuildStructure(ulong id) => Conn?.Reducers.RemoveStructure(id);
 	public void MoveItemSlot(ulong id, int slot) => Conn?.Reducers.MoveItemToSlot(id, slot);

@@ -12,12 +12,12 @@ namespace SpacetimeDB.Types
 {
     public sealed partial class RemoteReducers : RemoteBase
     {
-        public delegate void CraftItemHandler(ReducerEventContext ctx, ulong recipeId);
+        public delegate void CraftItemHandler(ReducerEventContext ctx, ulong recipeId, string station);
         public event CraftItemHandler? OnCraftItem;
 
-        public void CraftItem(ulong recipeId)
+        public void CraftItem(ulong recipeId, string station)
         {
-            conn.InternalCallReducer(new Reducer.CraftItem(recipeId));
+            conn.InternalCallReducer(new Reducer.CraftItem(recipeId, station));
         }
 
         public bool InvokeCraftItem(ReducerEventContext ctx, Reducer.CraftItem args)
@@ -36,7 +36,8 @@ namespace SpacetimeDB.Types
             }
             OnCraftItem(
                 ctx,
-                args.RecipeId
+                args.RecipeId,
+                args.Station
             );
             return true;
         }
@@ -50,14 +51,21 @@ namespace SpacetimeDB.Types
         {
             [DataMember(Name = "recipe_id")]
             public ulong RecipeId;
+            [DataMember(Name = "station")]
+            public string Station;
 
-            public CraftItem(ulong RecipeId)
+            public CraftItem(
+                ulong RecipeId,
+                string Station
+            )
             {
                 this.RecipeId = RecipeId;
+                this.Station = Station;
             }
 
             public CraftItem()
             {
+                this.Station = "";
             }
 
             string IReducerArgs.ReducerName => "craft_item";

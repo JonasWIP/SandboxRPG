@@ -23,13 +23,16 @@ namespace SpacetimeDB.Types
         public string Ingredients;
         [DataMember(Name = "craft_time_seconds")]
         public float CraftTimeSeconds;
+        [DataMember(Name = "station")]
+        public string Station;
 
         public CraftingRecipe(
             ulong Id,
             string ResultItemType,
             uint ResultQuantity,
             string Ingredients,
-            float CraftTimeSeconds
+            float CraftTimeSeconds,
+            string Station
         )
         {
             this.Id = Id;
@@ -37,12 +40,14 @@ namespace SpacetimeDB.Types
             this.ResultQuantity = ResultQuantity;
             this.Ingredients = Ingredients;
             this.CraftTimeSeconds = CraftTimeSeconds;
+            this.Station = Station;
         }
 
         public CraftingRecipe()
         {
             this.ResultItemType = "";
             this.Ingredients = "";
+            this.Station = "";
         }
     }
 }

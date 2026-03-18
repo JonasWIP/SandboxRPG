@@ -27,7 +27,9 @@ namespace SpacetimeDB.Types
     {
         public RemoteTables(DbConnection conn)
         {
+            AddTable(AccessControl = new(conn));
             AddTable(ChatMessage = new(conn));
+            AddTable(ContainerSlot = new(conn));
             AddTable(CraftingRecipe = new(conn));
             AddTable(HelloWorldMessage = new(conn));
             AddTable(InventoryItem = new(conn));
@@ -532,7 +534,9 @@ namespace SpacetimeDB.Types
 
         internal static string[] AllTablesSqlQueries() => new string[]
         {
+            new QueryBuilder().From.AccessControl().ToSql(),
             new QueryBuilder().From.ChatMessage().ToSql(),
+            new QueryBuilder().From.ContainerSlot().ToSql(),
             new QueryBuilder().From.CraftingRecipe().ToSql(),
             new QueryBuilder().From.HelloWorldMessage().ToSql(),
             new QueryBuilder().From.InventoryItem().ToSql(),
@@ -547,7 +551,9 @@ namespace SpacetimeDB.Types
 
     public sealed class From
     {
+        public global::SpacetimeDB.Table<AccessControl, AccessControlCols, AccessControlIxCols> AccessControl() => new("access_control", new AccessControlCols("access_control"), new AccessControlIxCols("access_control"));
         public global::SpacetimeDB.Table<ChatMessage, ChatMessageCols, ChatMessageIxCols> ChatMessage() => new("chat_message", new ChatMessageCols("chat_message"), new ChatMessageIxCols("chat_message"));
+        public global::SpacetimeDB.Table<ContainerSlot, ContainerSlotCols, ContainerSlotIxCols> ContainerSlot() => new("container_slot", new ContainerSlotCols("container_slot"), new ContainerSlotIxCols("container_slot"));
         public global::SpacetimeDB.Table<CraftingRecipe, CraftingRecipeCols, CraftingRecipeIxCols> CraftingRecipe() => new("crafting_recipe", new CraftingRecipeCols("crafting_recipe"), new CraftingRecipeIxCols("crafting_recipe"));
         public global::SpacetimeDB.Table<HelloWorldMessage, HelloWorldMessageCols, HelloWorldMessageIxCols> HelloWorldMessage() => new("hello_world_message", new HelloWorldMessageCols("hello_world_message"), new HelloWorldMessageIxCols("hello_world_message"));
         public global::SpacetimeDB.Table<InventoryItem, InventoryItemCols, InventoryItemIxCols> InventoryItem() => new("inventory_item", new InventoryItemCols("inventory_item"), new InventoryItemIxCols("inventory_item"));
@@ -637,6 +643,9 @@ namespace SpacetimeDB.Types
             var eventContext = (ReducerEventContext)context;
             return reducer switch
             {
+                Reducer.ContainerDeposit args => Reducers.InvokeContainerDeposit(eventContext, args),
+                Reducer.ContainerTransfer args => Reducers.InvokeContainerTransfer(eventContext, args),
+                Reducer.ContainerWithdraw args => Reducers.InvokeContainerWithdraw(eventContext, args),
                 Reducer.CraftItem args => Reducers.InvokeCraftItem(eventContext, args),
                 Reducer.DropItem args => Reducers.InvokeDropItem(eventContext, args),
                 Reducer.HarvestWorldObject args => Reducers.InvokeHarvestWorldObject(eventContext, args),
@@ -649,6 +658,7 @@ namespace SpacetimeDB.Types
                 Reducer.SendChat args => Reducers.InvokeSendChat(eventContext, args),
                 Reducer.SetColor args => Reducers.InvokeSetColor(eventContext, args),
                 Reducer.SetName args => Reducers.InvokeSetName(eventContext, args),
+                Reducer.ToggleAccessControl args => Reducers.InvokeToggleAccessControl(eventContext, args),
                 _ => throw new ArgumentOutOfRangeException("Reducer", $"Unknown reducer {reducer}")
             };
         }

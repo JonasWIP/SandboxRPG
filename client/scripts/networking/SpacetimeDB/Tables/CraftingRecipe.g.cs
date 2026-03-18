@@ -44,6 +44,7 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Col<CraftingRecipe, uint> ResultQuantity { get; }
         public global::SpacetimeDB.Col<CraftingRecipe, string> Ingredients { get; }
         public global::SpacetimeDB.Col<CraftingRecipe, float> CraftTimeSeconds { get; }
+        public global::SpacetimeDB.Col<CraftingRecipe, string> Station { get; }
 
         public CraftingRecipeCols(string tableName)
         {
@@ -52,6 +53,7 @@ namespace SpacetimeDB.Types
             ResultQuantity = new global::SpacetimeDB.Col<CraftingRecipe, uint>(tableName, "result_quantity");
             Ingredients = new global::SpacetimeDB.Col<CraftingRecipe, string>(tableName, "ingredients");
             CraftTimeSeconds = new global::SpacetimeDB.Col<CraftingRecipe, float>(tableName, "craft_time_seconds");
+            Station = new global::SpacetimeDB.Col<CraftingRecipe, string>(tableName, "station");
         }
     }
 
