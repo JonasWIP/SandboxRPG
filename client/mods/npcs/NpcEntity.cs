@@ -155,17 +155,32 @@ public partial class NpcEntity : StaticBody3D, IInteractable, IAttackable
         AddChild(healthSprite);
     }
 
+    private bool _deathHandled;
+
     public override void _Process(double delta)
     {
         if (!NpcIsAlive)
         {
-            // Fade out on death
+            // Hide name label and health bar immediately on death
+            if (!_deathHandled)
+            {
+                _deathHandled = true;
+                _nameLabel.Visible = false;
+                var healthSprite = GetNodeOrNull<Sprite3D>("HealthBarSprite");
+                if (healthSprite != null) healthSprite.Visible = false;
+                _material.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
+            }
+
+            // Fade out mesh, then free
             if (_material.AlbedoColor.A > 0.01f)
             {
                 var c = _material.AlbedoColor;
                 c.A = Mathf.MoveToward(c.A, 0f, (float)delta * 2f);
                 _material.AlbedoColor = c;
-                _material.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
+            }
+            else
+            {
+                Visible = false; // fully hidden after fade
             }
             return;
         }
@@ -180,9 +195,21 @@ public partial class NpcEntity : StaticBody3D, IInteractable, IAttackable
     {
         _targetPosition = new Vector3(npc.PosX, npc.PosY, npc.PosZ);
         _targetRotY = npc.RotY;
-        NpcIsAlive = npc.IsAlive;
         NpcHealth = npc.Health;
         NpcMaxHealth = npc.MaxHealth;
+
+        // Handle respawn: NPC came back alive
+        if (npc.IsAlive && !NpcIsAlive && _deathHandled)
+        {
+            _deathHandled = false;
+            Visible = true;
+            _nameLabel.Visible = true;
+            _material.Transparency = BaseMaterial3D.TransparencyEnum.Disabled;
+            var tint = NpcVisualRegistry.Get(NpcType)?.TintColor ?? Colors.Gray;
+            _material.AlbedoColor = tint;
+        }
+
+        NpcIsAlive = npc.IsAlive;
 
         // Update health bar
         if (_healthBar != null)
