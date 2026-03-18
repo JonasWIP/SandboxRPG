@@ -11,6 +11,14 @@ public class StructureSpawner
     private readonly GameManager _gm;
     private readonly Dictionary<ulong, Node3D> _structures = new();
 
+    private static readonly HashSet<string> InteractableTypes = new()
+    {
+        "chest",
+        "furnace",
+        "crafting_table",
+        "sign",
+    };
+
     public StructureSpawner(Node3D parent, GameManager gm)
     {
         _parent = parent;
@@ -43,10 +51,31 @@ public class StructureSpawner
             _structures.Remove(id);
     }
 
+    private static bool IsInteractable(string structureType) =>
+        InteractableTypes.Contains(structureType);
+
     private static Node3D CreateStructureVisual(PlacedStructure s)
     {
         var def  = StructureRegistry.Get(s.StructureType);
-        var body = new StaticBody3D { Name = $"Structure_{s.Id}", CollisionLayer = 1, CollisionMask = 1 };
+
+        StaticBody3D body;
+        if (IsInteractable(s.StructureType))
+        {
+            var interactable = new InteractableStructure
+            {
+                Name          = $"Structure_{s.Id}",
+                CollisionLayer = 1,
+                CollisionMask  = 1,
+                StructureId   = s.Id,
+                StructureType = s.StructureType,
+                OwnerId       = s.OwnerId,
+            };
+            body = interactable;
+        }
+        else
+        {
+            body = new StaticBody3D { Name = $"Structure_{s.Id}", CollisionLayer = 1, CollisionMask = 1 };
+        }
 
         var visual = ContentSpawner.SpawnVisual(def, s.StructureType);
         body.AddChild(visual);

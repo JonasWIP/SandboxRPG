@@ -27,6 +27,9 @@ public static class BaseContent
         ItemRegistry.Register("wood_axe",      new ItemDef { DisplayName = "Wood Axe",      MaxStack = 1 });
         ItemRegistry.Register("stone_pickaxe", new ItemDef { DisplayName = "Stone Pickaxe", MaxStack = 1 });
         ItemRegistry.Register("iron_pickaxe",  new ItemDef { DisplayName = "Iron Pickaxe",  MaxStack = 1 });
+        ItemRegistry.Register("furnace",        new ItemDef { DisplayName = "Furnace",        MaxStack = 1 });
+        ItemRegistry.Register("crafting_table", new ItemDef { DisplayName = "Crafting Table", MaxStack = 1 });
+        ItemRegistry.Register("sign",           new ItemDef { DisplayName = "Sign",           MaxStack = 10 });
     }
 
     private static void RegisterStructures()
