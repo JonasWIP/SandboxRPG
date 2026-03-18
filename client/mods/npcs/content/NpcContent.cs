@@ -16,7 +16,7 @@ public static class NpcContent
     {
         NpcVisualRegistry.Register("wolf", new NpcVisualDef
         {
-            DisplayName = "Wolf", Scale = 0.8f,
+            DisplayName = "Wolf", Scale = 0.5f,
             TintColor = new Color(0.5f, 0.5f, 0.5f),
             HealthBarColor = Colors.Red,
         });
@@ -53,10 +53,10 @@ public static class NpcContent
     private static void RegisterItems()
     {
         // New items for NPC system
-        ItemRegistry.Register("iron_sword",    new ItemDef { DisplayName = "Iron Sword",    MaxStack = 1 });
-        ItemRegistry.Register("health_potion", new ItemDef { DisplayName = "Health Potion", MaxStack = 10, TintColor = new Color(0.9f, 0.2f, 0.2f) });
-        ItemRegistry.Register("raw_meat",      new ItemDef { DisplayName = "Raw Meat",      MaxStack = 20, TintColor = new Color(0.8f, 0.3f, 0.3f) });
-        ItemRegistry.Register("wolf_pelt",     new ItemDef { DisplayName = "Wolf Pelt",     MaxStack = 10, TintColor = new Color(0.6f, 0.5f, 0.4f) });
-        ItemRegistry.Register("bread",         new ItemDef { DisplayName = "Bread",         MaxStack = 20, TintColor = new Color(0.9f, 0.8f, 0.5f) });
+        ItemRegistry.Register("iron_sword",    new ItemDef { DisplayName = "Iron Sword",    MaxStack = 1,  Scale = 0.3f });
+        ItemRegistry.Register("health_potion", new ItemDef { DisplayName = "Health Potion", MaxStack = 10, Scale = 0.25f, TintColor = new Color(0.9f, 0.2f, 0.2f) });
+        ItemRegistry.Register("raw_meat",      new ItemDef { DisplayName = "Raw Meat",      MaxStack = 20, Scale = 0.25f, TintColor = new Color(0.8f, 0.3f, 0.3f) });
+        ItemRegistry.Register("wolf_pelt",     new ItemDef { DisplayName = "Wolf Pelt",     MaxStack = 10, Scale = 0.3f,  TintColor = new Color(0.6f, 0.5f, 0.4f) });
+        ItemRegistry.Register("bread",         new ItemDef { DisplayName = "Bread",         MaxStack = 20, Scale = 0.25f, TintColor = new Color(0.9f, 0.8f, 0.5f) });
     }
 }
