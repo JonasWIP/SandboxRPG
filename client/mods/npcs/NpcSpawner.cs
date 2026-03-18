@@ -50,6 +50,10 @@ public class NpcSpawner
 
     private void Spawn(Npc npc)
     {
+        float groundY = Terrain.HeightAt(npc.PosX, npc.PosZ);
+        float y = npc.PosY > 0.01f ? npc.PosY : groundY;
+        var spawnPos = new Vector3(npc.PosX, y, npc.PosZ);
+
         var entity = new NpcEntity
         {
             Name = $"Npc_{npc.NpcType}_{npc.Id}",
@@ -58,13 +62,11 @@ public class NpcSpawner
             NpcIsAlive = npc.IsAlive,
             NpcHealth = npc.Health,
             NpcMaxHealth = npc.MaxHealth,
+            // Set position/rotation before AddChild so _Ready picks up the correct values
+            Position = spawnPos,
+            Rotation = new Vector3(0, npc.RotY, 0),
         };
         _parent.AddChild(entity);
-
-        float groundY = Terrain.HeightAt(npc.PosX, npc.PosZ);
-        float y = npc.PosY > 0.01f ? npc.PosY : groundY;
-        entity.GlobalPosition = new Vector3(npc.PosX, y, npc.PosZ);
-        entity.Rotation = new Vector3(0, npc.RotY, 0);
 
         _npcs[npc.Id] = entity;
         GD.Print($"[NpcSpawner] Spawned {npc.NpcType} (id={npc.Id})");

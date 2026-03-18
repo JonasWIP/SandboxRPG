@@ -178,7 +178,7 @@ public partial class NpcEntity : StaticBody3D, IInteractable, IAttackable
         NpcHealth = npc.Health;
         NpcMaxHealth = npc.MaxHealth;
 
-        // Handle respawn: NPC came back alive
+        // Handle respawn: NPC came back alive — teleport immediately, don't lerp
         if (npc.IsAlive && !NpcIsAlive && _deathHandled)
         {
             _deathHandled = false;
@@ -186,6 +186,7 @@ public partial class NpcEntity : StaticBody3D, IInteractable, IAttackable
             _nameLabel.Visible = true;
             _material.Transparency = BaseMaterial3D.TransparencyEnum.Disabled;
             _material.AlbedoColor = _cachedVisual?.TintColor ?? Colors.Gray;
+            GlobalPosition = _targetPosition;
         }
 
         NpcIsAlive = npc.IsAlive;
