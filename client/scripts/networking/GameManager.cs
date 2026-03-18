@@ -57,6 +57,8 @@ public partial class GameManager : Node
 	[Signal] public delegate void TerrainConfigChangedEventHandler();
 	[Signal] public delegate void AccessControlChangedEventHandler();
 	[Signal] public delegate void ContainerSlotChangedEventHandler();
+	[Signal] public delegate void NpcUpdatedEventHandler(long npcId, bool removed);
+	[Signal] public delegate void DamageEventReceivedEventHandler(long eventId);
 
 	// =========================================================================
 	// GODOT LIFECYCLE
@@ -123,6 +125,8 @@ public partial class GameManager : Node
 		=> Conn?.Reducers.ContainerWithdraw(containerId, containerTable, fromSlot, quantity);
 	public void ContainerTransfer(ulong containerId, string containerTable, int fromSlot, int toSlot)
 		=> Conn?.Reducers.ContainerTransfer(containerId, containerTable, fromSlot, toSlot);
+	public void AttackNpc(ulong npcId) => Conn?.Reducers.PlayerAttackNpc(npcId);
+	public void TradeWithNpc(ulong npcId, string itemType, uint qty) => Conn?.Reducers.NpcTrade(npcId, itemType, qty);
 
 	// =========================================================================
 	// DATA ACCESS — READ FROM STDB CLIENT CACHE
@@ -167,6 +171,22 @@ public partial class GameManager : Node
 		foreach (var ac in Conn.Db.AccessControl.Iter())
 			if (ac.EntityId == entityId && ac.EntityTable == entityTable) return ac;
 		return null;
+	}
+	public IEnumerable<Npc> GetAllNpcs() { if (Conn != null) foreach (var n in Conn.Db.Npc.Iter()) yield return n; }
+	public Npc? GetNpc(ulong id) => Conn?.Db.Npc.Id.Find(id);
+	public IEnumerable<DamageEvent> GetRecentDamageEvents() { if (Conn != null) foreach (var e in Conn.Db.DamageEvent.Iter()) yield return e; }
+	public NpcConfig? GetNpcConfig(string npcType)
+	{
+		if (Conn == null) return null;
+		foreach (var c in Conn.Db.NpcConfig.Iter())
+			if (c.NpcType == npcType) return c;
+		return null;
+	}
+	public IEnumerable<NpcTradeOffer> GetTradeOffers(string npcType)
+	{
+		if (Conn == null) yield break;
+		foreach (var o in Conn.Db.NpcTradeOffer.Iter())
+			if (o.NpcType == npcType) yield return o;
 	}
 
 	// =========================================================================
@@ -297,6 +317,11 @@ public partial class GameManager : Node
 		conn.Db.ContainerSlot.OnInsert += (ctx, _) => CallDeferred(nameof(EmitContainerSlotChanged));
 		conn.Db.ContainerSlot.OnUpdate += (ctx, _, _) => CallDeferred(nameof(EmitContainerSlotChanged));
 		conn.Db.ContainerSlot.OnDelete += (ctx, _) => CallDeferred(nameof(EmitContainerSlotChanged));
+
+		conn.Db.Npc.OnInsert += (ctx, n) => CallDeferred(nameof(EmitNpcUpdated), (long)n.Id, false);
+		conn.Db.Npc.OnUpdate += (ctx, _, n) => CallDeferred(nameof(EmitNpcUpdated), (long)n.Id, false);
+		conn.Db.Npc.OnDelete += (ctx, n) => CallDeferred(nameof(EmitNpcUpdated), (long)n.Id, true);
+		conn.Db.DamageEvent.OnInsert += (ctx, e) => CallDeferred(nameof(EmitDamageEventReceived), (long)e.Id);
 	}
 
 	// Deferred signal emitters (thread-safe hop back to main thread)
@@ -311,6 +336,8 @@ public partial class GameManager : Node
 	private void EmitTerrainConfigChanged() => EmitSignal(SignalName.TerrainConfigChanged);
 	private void EmitAccessControlChanged() => EmitSignal(SignalName.AccessControlChanged);
 	private void EmitContainerSlotChanged() => EmitSignal(SignalName.ContainerSlotChanged);
+	private void EmitNpcUpdated(long id, bool removed) => EmitSignal(SignalName.NpcUpdated, id, removed);
+	private void EmitDamageEventReceived(long id) => EmitSignal(SignalName.DamageEventReceived, id);
 
 	// =========================================================================
 	// AUTH TOKEN PERSISTENCE
