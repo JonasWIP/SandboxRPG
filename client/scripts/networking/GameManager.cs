@@ -55,6 +55,8 @@ public partial class GameManager : Node
 	[Signal] public delegate void RecipesLoadedEventHandler();
 	[Signal] public delegate void WorldObjectUpdatedEventHandler(long id, bool removed);
 	[Signal] public delegate void TerrainConfigChangedEventHandler();
+	[Signal] public delegate void AccessControlChangedEventHandler();
+	[Signal] public delegate void ContainerSlotChangedEventHandler();
 
 	// =========================================================================
 	// GODOT LIFECYCLE
@@ -114,6 +116,13 @@ public partial class GameManager : Node
 	public void RemoveBuildStructure(ulong id) => Conn?.Reducers.RemoveStructure(id);
 	public void MoveItemSlot(ulong id, int slot) => Conn?.Reducers.MoveItemToSlot(id, slot);
 	public void HarvestWorldObject(ulong id, string toolType) => Conn?.Reducers.HarvestWorldObject(id, toolType);
+	public void ToggleAccess(ulong entityId, string entityTable) => Conn?.Reducers.ToggleAccessControl(entityId, entityTable);
+	public void ContainerDeposit(ulong containerId, string containerTable, ulong inventoryItemId, int toSlot, uint quantity)
+		=> Conn?.Reducers.ContainerDeposit(containerId, containerTable, inventoryItemId, toSlot, quantity);
+	public void ContainerWithdraw(ulong containerId, string containerTable, int fromSlot, uint quantity)
+		=> Conn?.Reducers.ContainerWithdraw(containerId, containerTable, fromSlot, quantity);
+	public void ContainerTransfer(ulong containerId, string containerTable, int fromSlot, int toSlot)
+		=> Conn?.Reducers.ContainerTransfer(containerId, containerTable, fromSlot, toSlot);
 
 	// =========================================================================
 	// DATA ACCESS — READ FROM STDB CLIENT CACHE
@@ -145,6 +154,20 @@ public partial class GameManager : Node
 	public IEnumerable<WorldObject>    GetAllWorldObjects() { if (Conn != null) foreach (var o in Conn.Db.WorldObject.Iter())      yield return o; }
 	public WorldObject? GetWorldObject(ulong id) => Conn?.Db.WorldObject.Id.Find(id);
 	public TerrainConfig? GetTerrainConfig() => Conn?.Db.TerrainConfig.Id.Find(0);
+	public IEnumerable<AccessControl> GetAllAccessControls() { if (Conn != null) foreach (var a in Conn.Db.AccessControl.Iter()) yield return a; }
+	public IEnumerable<ContainerSlot> GetContainerSlots(ulong containerId)
+	{
+		if (Conn == null) yield break;
+		foreach (var cs in Conn.Db.ContainerSlot.Iter())
+			if (cs.ContainerId == containerId) yield return cs;
+	}
+	public AccessControl? GetAccessControl(ulong entityId, string entityTable)
+	{
+		if (Conn == null) return null;
+		foreach (var ac in Conn.Db.AccessControl.Iter())
+			if (ac.EntityId == entityId && ac.EntityTable == entityTable) return ac;
+		return null;
+	}
 
 	// =========================================================================
 	// PRIVATE — CONNECTION IMPLEMENTATION
@@ -266,6 +289,14 @@ public partial class GameManager : Node
 
 		conn.Db.TerrainConfig.OnInsert += (ctx, _) => CallDeferred(nameof(EmitTerrainConfigChanged));
 		conn.Db.TerrainConfig.OnUpdate += (ctx, _, _) => CallDeferred(nameof(EmitTerrainConfigChanged));
+
+		conn.Db.AccessControl.OnInsert += (ctx, _) => CallDeferred(nameof(EmitAccessControlChanged));
+		conn.Db.AccessControl.OnUpdate += (ctx, _, _) => CallDeferred(nameof(EmitAccessControlChanged));
+		conn.Db.AccessControl.OnDelete += (ctx, _) => CallDeferred(nameof(EmitAccessControlChanged));
+
+		conn.Db.ContainerSlot.OnInsert += (ctx, _) => CallDeferred(nameof(EmitContainerSlotChanged));
+		conn.Db.ContainerSlot.OnUpdate += (ctx, _, _) => CallDeferred(nameof(EmitContainerSlotChanged));
+		conn.Db.ContainerSlot.OnDelete += (ctx, _) => CallDeferred(nameof(EmitContainerSlotChanged));
 	}
 
 	// Deferred signal emitters (thread-safe hop back to main thread)
@@ -278,6 +309,8 @@ public partial class GameManager : Node
 	private void EmitRecipesLoaded()           => EmitSignal(SignalName.RecipesLoaded);
 	private void EmitWorldObjectUpdated(long id, bool removed) => EmitSignal(SignalName.WorldObjectUpdated, id, removed);
 	private void EmitTerrainConfigChanged() => EmitSignal(SignalName.TerrainConfigChanged);
+	private void EmitAccessControlChanged() => EmitSignal(SignalName.AccessControlChanged);
+	private void EmitContainerSlotChanged() => EmitSignal(SignalName.ContainerSlotChanged);
 
 	// =========================================================================
 	// AUTH TOKEN PERSISTENCE
