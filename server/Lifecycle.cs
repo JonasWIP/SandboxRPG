@@ -10,6 +10,14 @@ public static partial class Module
     public static void Init(ReducerContext ctx)
     {
         Log.Info("SandboxRPG server module initialized!");
+        // Force static field initializers to run — WASM doesn't guarantee
+        // they execute before Init. Touching each mod field triggers the
+        // static constructor which calls ModLoader.Register().
+        _ = _baseMod;
+        _ = _helloWorldMod;
+        _ = _interactablesMod;
+        _ = _currencyMod;
+        _ = _npcsMod;
         ModLoader.RunAll(ctx);
     }
 

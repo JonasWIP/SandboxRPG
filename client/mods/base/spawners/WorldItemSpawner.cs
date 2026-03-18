@@ -39,11 +39,25 @@ public class WorldItemSpawner
 
     private static Node3D CreateWorldItemVisual(WorldItem item)
     {
-        var body = new StaticBody3D { Name = $"WorldItem_{item.Id}", CollisionLayer = 2, CollisionMask = 0 };
-        var visual = ContentSpawner.SpawnVisual(ItemRegistry.Get(item.ItemType), item.ItemType);
-        visual.Position = new Vector3(0, 0.1f, 0); // lift slightly off ground (matches original)
+        var body = new WorldItemPickup
+        {
+            Name = $"WorldItem_{item.Id}",
+            CollisionLayer = 2,
+            CollisionMask = 0,
+            WorldItemId = item.Id,
+            ItemType = item.ItemType,
+            Quantity = item.Quantity,
+        };
+        var def = ItemRegistry.Get(item.ItemType);
+        var visual = ContentSpawner.SpawnVisual(def, item.ItemType);
+        float itemScale = def?.Scale ?? 0.4f;
+        visual.Position = new Vector3(0, 0.1f, 0);
         body.AddChild(visual);
-        body.AddChild(new CollisionShape3D { Shape = new SphereShape3D { Radius = 0.2f } });
+        body.AddChild(new CollisionShape3D
+        {
+            Shape = new SphereShape3D { Radius = Mathf.Max(0.3f, itemScale) },
+            Position = new Vector3(0, 0.1f + itemScale * 0.5f, 0),
+        });
         body.AddChild(new Label3D
         {
             Text = $"{item.ItemType} x{item.Quantity}", FontSize = 32,
@@ -52,8 +66,6 @@ public class WorldItemSpawner
         });
         float groundY = Terrain.HeightAt(item.PosX, item.PosZ);
         body.Position = new Vector3(item.PosX, groundY + 0.1f, item.PosZ);
-        body.SetMeta("world_item_id", (long)item.Id);
-        body.SetMeta("item_type", item.ItemType);
         return body;
     }
 }

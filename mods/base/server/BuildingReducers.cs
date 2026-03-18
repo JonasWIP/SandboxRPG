@@ -29,7 +29,7 @@ public static partial class Module
 
         float maxHealth = StructureConfig.GetMaxHealth(structureType);
 
-        ctx.Db.PlacedStructure.Insert(new PlacedStructure
+        var placed = ctx.Db.PlacedStructure.Insert(new PlacedStructure
         {
             OwnerId = identity,
             StructureType = structureType,
@@ -40,6 +40,9 @@ public static partial class Module
             Health = maxHealth,
             MaxHealth = maxHealth,
         });
+
+        // Fire placement hooks registered by mods
+        StructureHooks.FireOnPlace(ctx, placed);
 
         // Consume one item
         var item = foundItem.Value;
@@ -63,6 +66,9 @@ public static partial class Module
         var s = structure.Value;
         if (s.OwnerId != ctx.Sender)
             throw new Exception("You can only remove your own structures.");
+
+        // Fire removal hooks registered by mods (before deletion so rows still exist)
+        StructureHooks.FireOnRemove(ctx, s);
 
         // Refund the item
         ctx.Db.InventoryItem.Insert(new InventoryItem

@@ -2,32 +2,23 @@ using Godot;
 
 namespace SandboxRPG;
 
-/// <summary>
-/// Handles player interactions via a single centre-screen raycast.
-/// Layer 1 = terrain / world objects / structures.
-/// Layer 2 = world items (pickup).
-/// Priority: world item > world object (harvest).
-/// </summary>
 public partial class InteractionSystem : Node
 {
     [Export] public float InteractionRange = 5.0f;
 
     private Camera3D? _camera;
-    private Label?    _interactionHint;
+    private Label? _interactionHint;
 
     public override void _Ready()
     {
         _interactionHint = new Label
         {
-            Text                = "",
+            Text = "",
             HorizontalAlignment = HorizontalAlignment.Center,
-            AnchorLeft          = 0.5f,
-            AnchorRight         = 0.5f,
-            AnchorTop           = 0.6f,
-            AnchorBottom        = 0.6f,
-            OffsetLeft          = -200,
-            OffsetRight         = 200,
-            Visible             = false,
+            AnchorLeft = 0.5f, AnchorRight = 0.5f,
+            AnchorTop = 0.6f, AnchorBottom = 0.6f,
+            OffsetLeft = -200, OffsetRight = 200,
+            Visible = false,
         };
         _interactionHint.AddThemeColorOverride("font_color", new Color(1, 1, 1));
         _interactionHint.AddThemeFontSizeOverride("font_size", 18);
@@ -39,69 +30,93 @@ public partial class InteractionSystem : Node
         _camera ??= GetViewport()?.GetCamera3D();
         if (_camera == null) return;
 
+        // Don't process interactions while UI is open
+        if (UIManager.Instance.IsAnyOpen)
+        { HideHint(); return; }
+
         var spaceState = _camera.GetWorld3D()?.DirectSpaceState;
         if (spaceState == null) return;
 
         var screenCenter = GetViewport().GetVisibleRect().Size / 2;
         var from = _camera.ProjectRayOrigin(screenCenter);
-        var to   = from + _camera.ProjectRayNormal(screenCenter) * InteractionRange;
+        var to = from + _camera.ProjectRayNormal(screenCenter) * InteractionRange;
 
-        // Single raycast — hits items (layer 2) and world objects (layer 1)
         var query = PhysicsRayQueryParameters3D.Create(from, to);
-        query.CollisionMask = 3; // layers 1 + 2
+        query.CollisionMask = 3;
         var result = spaceState.IntersectRay(query);
 
         if (result.Count == 0 || !result.ContainsKey("collider"))
-        {
-            HideHint();
-            return;
-        }
+        { HideHint(); return; }
 
         var collider = result["collider"].As<Node>();
         if (collider == null) { HideHint(); return; }
 
-        // World item — pick up with E
-        if (collider.HasMeta("world_item_id"))
+        var interactable = FindInteractable(collider);
+        var attackable = FindAttackable(collider);
+
+        if (interactable == null && attackable == null) { HideHint(); return; }
+
+        var player = GameManager.Instance.GetLocalPlayer();
+
+        // Interaction takes priority for hint display
+        if (interactable != null && interactable.CanInteract(player))
         {
-            var itemId   = (ulong)collider.GetMeta("world_item_id").AsInt64();
-            var itemType = collider.GetMeta("item_type", "item").AsString();
+            string hint = interactable.HintText;
+            if (attackable != null && attackable.CanAttack(player))
+                hint += $"\n{attackable.AttackHintText}";
+            ShowHint(hint);
 
-            // Find live quantity from server data
-            uint qty = 1;
-            foreach (var wi in GameManager.Instance.GetAllWorldItems())
-                if (wi.Id == itemId) { qty = wi.Quantity; break; }
-
-            ShowHint($"[E] Pick up {itemType} x{qty}");
-
-            if (Input.IsActionJustPressed("interact"))
-                GameManager.Instance.PickupWorldItem(itemId);
-
-            return;
+            if (Input.IsActionJustPressed(interactable.InteractAction))
+                interactable.Interact(player);
+            if (attackable != null && Input.IsActionJustPressed("primary_attack") && attackable.CanAttack(player))
+                attackable.Attack(player);
         }
-
-        // World object — harvest with LMB
-        if (collider.IsInGroup("world_object"))
+        else if (attackable != null && attackable.CanAttack(player))
         {
-            var objectType = collider.GetMeta("object_type", "object").AsString();
-            ShowHint($"[LMB] Harvest {objectType}");
-
-            if (Input.IsActionJustPressed("primary_attack") && !BuildSystem.IsBuildable(Hotbar.Instance?.ActiveItemType))
-            {
-                var id       = (ulong)collider.GetMeta("world_object_id", 0L).AsInt64();
-                var toolType = Hotbar.Instance?.ActiveItemType ?? string.Empty;
-                GameManager.Instance.HarvestWorldObject(id, toolType);
-            }
-
-            return;
+            ShowHint(attackable.AttackHintText);
+            if (Input.IsActionJustPressed("primary_attack"))
+                attackable.Attack(player);
         }
+        else if (interactable != null && attackable == null)
+        {
+            // Only show "[Private]" for pure interactables (e.g. locked chests),
+            // not for attackable-only entities like wolves
+            ShowHint("[Private]");
+        }
+        else
+        {
+            HideHint();
+        }
+    }
 
-        HideHint();
+    private static IInteractable? FindInteractable(Node node)
+    {
+        Node? current = node;
+        for (int i = 0; i < 4 && current != null; i++)
+        {
+            if (current is IInteractable interactable)
+                return interactable;
+            current = current.GetParent();
+        }
+        return null;
+    }
+
+    private static IAttackable? FindAttackable(Node node)
+    {
+        Node? current = node;
+        for (int i = 0; i < 4 && current != null; i++)
+        {
+            if (current is IAttackable attackable)
+                return attackable;
+            current = current.GetParent();
+        }
+        return null;
     }
 
     private void ShowHint(string text)
     {
         if (_interactionHint == null) return;
-        _interactionHint.Text    = text;
+        _interactionHint.Text = text;
         _interactionHint.Visible = true;
     }
 

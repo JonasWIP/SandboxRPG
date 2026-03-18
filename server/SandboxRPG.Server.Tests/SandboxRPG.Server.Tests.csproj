@@ -19,7 +19,14 @@
     <Compile Include="../../mods/base/server/InventoryHelpers.cs" />
     <!-- Hello-world constants (no SpacetimeDB) -->
     <Compile Include="../../mods/hello-world/server/HelloWorldConstants.cs" />
+    <!-- Testable config registries (pure C#, no SpacetimeDB) -->
+    <Compile Include="../../mods/base/server/StructureConfig.cs" />
+    <Compile Include="../../mods/base/server/HarvestConfig.cs" />
+    <Compile Include="../ContainerConfig.cs" />
+    <Compile Include="../../mods/interactables/server/SmeltConfig.cs" />
     <!-- Per-mod test files (glob picks up all future mods automatically) -->
     <Compile Include="../../mods/hello-world/server/tests/*.cs" />
+    <Compile Include="../../mods/base/server/tests/*.cs" />
+    <Compile Include="../../mods/interactables/server/tests/*.cs" />
   </ItemGroup>
 </Project>
