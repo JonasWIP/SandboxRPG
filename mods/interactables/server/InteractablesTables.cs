@@ -21,25 +21,4 @@ public static partial class Module
         [PrimaryKey] public ulong StructureId;
         public string Text;
     }
-
-    /// <summary>Access control for interactable structures — who can use a structure.</summary>
-    [Table(Name = "access_control", Public = true)]
-    public partial struct AccessControl
-    {
-        [PrimaryKey] public ulong StructureId;
-        public Identity OwnerId;
-        public bool IsPublic; // if true, anyone can interact
-    }
-
-    /// <summary>Container slots — items stored inside a chest or furnace.</summary>
-    [Table(Name = "container_slot", Public = true)]
-    public partial struct ContainerSlot
-    {
-        [AutoInc][PrimaryKey] public ulong Id;
-        public ulong ContainerId;   // structureId of the owning structure
-        public string ContainerType; // "chest", "furnace"
-        public string ItemType;
-        public uint Quantity;
-        public int Slot;
-    }
 }

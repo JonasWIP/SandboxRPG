@@ -6,181 +6,172 @@ namespace SandboxRPG.Server;
 
 public static partial class Module
 {
-    // =========================================================================
-    // FURNACE REDUCERS
-    // =========================================================================
-
     [Reducer]
-    public static void FurnaceStartSmelt(ReducerContext ctx, ulong structureId, string inputItem)
+    public static void FurnaceStartSmelt(ReducerContext ctx, ulong structureId)
     {
-        // Verify the structure exists and is a furnace
-        var structure = ctx.Db.PlacedStructure.Id.Find(structureId);
-        if (structure is null)
-            throw new Exception("Furnace not found.");
-        if (structure.Value.StructureType != "furnace")
-            throw new Exception("Structure is not a furnace.");
+        if (!AccessControlHelper.CanAccess(ctx, structureId, EntityTables.PlacedStructure))
+            throw new Exception("Access denied.");
 
-        // Check access
-        var ac = ctx.Db.AccessControl.StructureId.Find(structureId);
-        if (ac is null || (!ac.Value.IsPublic && ac.Value.OwnerId != ctx.Sender))
-            throw new Exception("You do not have access to this furnace.");
-
-        // Ensure no active smelt
         var existing = ctx.Db.FurnaceState.StructureId.Find(structureId);
         if (existing is not null)
             throw new Exception("Furnace is already smelting.");
 
-        // Validate recipe
-        var recipe = SmeltConfig.Get(inputItem);
-        if (recipe is null)
-            throw new Exception($"No smelt recipe for '{inputItem}'.");
-
-        // Consume input item from the furnace's container slot
+        // Find input slot content (slot 0)
         ContainerSlot? inputSlot = null;
-        foreach (var slot in ctx.Db.ContainerSlot.Iter())
-        {
-            if (slot.ContainerId == structureId && slot.ItemType == inputItem)
-            {
-                inputSlot = slot;
-                break;
-            }
-        }
-        if (inputSlot is null)
-            throw new Exception($"Furnace does not contain '{inputItem}'.");
+        foreach (var cs in ctx.Db.ContainerSlot.Iter())
+            if (cs.ContainerId == structureId && cs.ContainerTable == EntityTables.PlacedStructure && cs.Slot == 0)
+            { inputSlot = cs; break; }
 
-        var s = inputSlot.Value;
-        if (s.Quantity <= 1)
-            ctx.Db.ContainerSlot.Delete(s);
-        else
-        {
-            s.Quantity -= 1;
-            ctx.Db.ContainerSlot.Id.Update(s);
-        }
+        if (inputSlot is null || string.IsNullOrEmpty(inputSlot.Value.ItemType))
+            throw new Exception("Furnace input is empty.");
 
-        ulong nowMs = (ulong)((DateTimeOffset)ctx.Timestamp).ToUnixTimeMilliseconds();
+        var input = inputSlot.Value;
+        var recipe = SmeltConfig.Get(input.ItemType);
+        if (recipe is null)
+            throw new Exception($"Cannot smelt {input.ItemType}.");
+
+        var r = recipe.Value;
+        var now = (ulong)((DateTimeOffset)ctx.Timestamp).ToUnixTimeMilliseconds();
 
         ctx.Db.FurnaceState.Insert(new FurnaceState
         {
             StructureId = structureId,
-            RecipeType  = inputItem,
-            StartTimeMs = nowMs,
-            DurationMs  = recipe.Value.DurationMs,
-            Complete    = false,
+            RecipeType = input.ItemType,
+            StartTimeMs = now,
+            DurationMs = r.DurationMs,
+            Complete = false,
         });
 
-        Log.Info($"[Interactables] Furnace {structureId} started smelting '{inputItem}'.");
+        // Consume one input item
+        if (input.Quantity <= 1)
+            ctx.Db.ContainerSlot.Delete(input);
+        else
+        {
+            input.Quantity -= 1;
+            ctx.Db.ContainerSlot.Id.Update(input);
+        }
+
+        Log.Info($"Furnace {structureId} started smelting {r.InputItem}");
     }
 
     [Reducer]
     public static void FurnaceCollect(ReducerContext ctx, ulong structureId)
     {
-        // Verify the structure exists and is a furnace
-        var structure = ctx.Db.PlacedStructure.Id.Find(structureId);
-        if (structure is null)
-            throw new Exception("Furnace not found.");
-
-        // Check access
-        var ac = ctx.Db.AccessControl.StructureId.Find(structureId);
-        if (ac is null || (!ac.Value.IsPublic && ac.Value.OwnerId != ctx.Sender))
-            throw new Exception("You do not have access to this furnace.");
+        if (!AccessControlHelper.CanAccess(ctx, structureId, EntityTables.PlacedStructure))
+            throw new Exception("Access denied.");
 
         var state = ctx.Db.FurnaceState.StructureId.Find(structureId);
-        if (state is null)
-            throw new Exception("Furnace is not smelting.");
+        if (state is null) throw new Exception("Furnace is not smelting.");
 
         var fs = state.Value;
-        ulong nowMs = (ulong)((DateTimeOffset)ctx.Timestamp).ToUnixTimeMilliseconds();
+        var now = (ulong)((DateTimeOffset)ctx.Timestamp).ToUnixTimeMilliseconds();
 
-        if (!fs.Complete && nowMs < fs.StartTimeMs + fs.DurationMs)
-            throw new Exception("Smelting is not finished yet.");
+        if (now < fs.StartTimeMs + fs.DurationMs)
+            throw new Exception("Smelting not complete yet.");
 
         var recipe = SmeltConfig.Get(fs.RecipeType);
-        if (recipe is null)
-            throw new Exception($"No smelt recipe for '{fs.RecipeType}'.");
+        if (recipe is null) throw new Exception("Smelt recipe not found.");
 
-        // Give output to player
-        ctx.Db.InventoryItem.Insert(new InventoryItem
+        var r = recipe.Value;
+
+        // Place result in output slot (slot 1) or add to it
+        ContainerSlot? outputSlot = null;
+        foreach (var cs in ctx.Db.ContainerSlot.Iter())
+            if (cs.ContainerId == structureId && cs.ContainerTable == EntityTables.PlacedStructure && cs.Slot == 1)
+            { outputSlot = cs; break; }
+
+        if (outputSlot is not null)
         {
-            OwnerId  = ctx.Sender,
-            ItemType = recipe.Value.OutputItem,
-            Quantity = recipe.Value.OutputQuantity,
-            Slot     = -1,
-        });
+            var os = outputSlot.Value;
+            if (!string.IsNullOrEmpty(os.ItemType) && os.ItemType != r.OutputItem)
+                throw new Exception("Output slot occupied by different item. Withdraw first.");
+            os.ItemType = r.OutputItem;
+            os.Quantity += r.OutputQuantity;
+            ctx.Db.ContainerSlot.Id.Update(os);
+        }
+        else
+        {
+            ctx.Db.ContainerSlot.Insert(new ContainerSlot
+            {
+                ContainerId = structureId,
+                ContainerTable = EntityTables.PlacedStructure,
+                Slot = 1,
+                ItemType = r.OutputItem,
+                Quantity = r.OutputQuantity,
+            });
+        }
 
         ctx.Db.FurnaceState.Delete(fs);
-
-        Log.Info($"[Interactables] Player collected '{recipe.Value.OutputItem}' from furnace {structureId}.");
+        Log.Info($"Furnace {structureId} produced {r.OutputQuantity}x {r.OutputItem}");
     }
 
     [Reducer]
     public static void FurnaceCancelSmelt(ReducerContext ctx, ulong structureId)
     {
-        // Verify structure exists
-        var structure = ctx.Db.PlacedStructure.Id.Find(structureId);
-        if (structure is null)
-            throw new Exception("Furnace not found.");
-
-        // Check access — only owner can cancel
-        var ac = ctx.Db.AccessControl.StructureId.Find(structureId);
-        if (ac is null || ac.Value.OwnerId != ctx.Sender)
-            throw new Exception("You do not have permission to cancel smelting.");
+        if (!AccessControlHelper.CanAccess(ctx, structureId, EntityTables.PlacedStructure))
+            throw new Exception("Access denied.");
 
         var state = ctx.Db.FurnaceState.StructureId.Find(structureId);
-        if (state is null)
-            throw new Exception("Furnace is not smelting.");
+        if (state is null) throw new Exception("Furnace is not smelting.");
 
         var fs = state.Value;
 
-        // Refund input item back to the furnace container
-        ctx.Db.ContainerSlot.Insert(new ContainerSlot
+        // Return input item to input slot
+        ContainerSlot? inputSlot = null;
+        foreach (var cs in ctx.Db.ContainerSlot.Iter())
+            if (cs.ContainerId == structureId && cs.ContainerTable == EntityTables.PlacedStructure && cs.Slot == 0)
+            { inputSlot = cs; break; }
+
+        if (inputSlot is not null)
         {
-            ContainerId   = structureId,
-            ContainerType = "furnace",
-            ItemType      = fs.RecipeType,
-            Quantity      = 1,
-            Slot          = 0,
-        });
+            var slot = inputSlot.Value;
+            slot.ItemType = fs.RecipeType;
+            slot.Quantity += 1;
+            ctx.Db.ContainerSlot.Id.Update(slot);
+        }
+        else
+        {
+            ctx.Db.ContainerSlot.Insert(new ContainerSlot
+            {
+                ContainerId = structureId,
+                ContainerTable = EntityTables.PlacedStructure,
+                Slot = 0,
+                ItemType = fs.RecipeType,
+                Quantity = 1,
+            });
+        }
 
         ctx.Db.FurnaceState.Delete(fs);
-
-        Log.Info($"[Interactables] Smelting cancelled in furnace {structureId}.");
+        Log.Info($"Furnace {structureId} smelt cancelled");
     }
-
-    // =========================================================================
-    // SIGN REDUCER
-    // =========================================================================
 
     [Reducer]
     public static void UpdateSignText(ReducerContext ctx, ulong structureId, string text)
     {
-        // Verify the structure exists and is a sign
-        var structure = ctx.Db.PlacedStructure.Id.Find(structureId);
-        if (structure is null)
-            throw new Exception("Sign not found.");
-        if (structure.Value.StructureType != "sign")
-            throw new Exception("Structure is not a sign.");
+        if (!AccessControlHelper.CanAccess(ctx, structureId, EntityTables.PlacedStructure))
+            throw new Exception("Access denied.");
 
-        // Check access — only owner can update text
-        var ac = ctx.Db.AccessControl.StructureId.Find(structureId);
-        if (ac is null || ac.Value.OwnerId != ctx.Sender)
-            throw new Exception("You do not have permission to edit this sign.");
+        // Only owner can edit
+        var ac = AccessControlHelper.Find(ctx, structureId, EntityTables.PlacedStructure);
+        if (ac is not null && ac.Value.OwnerId != ctx.Sender)
+            throw new Exception("Only the owner can edit the sign.");
 
-        var existingText = ctx.Db.SignText.StructureId.Find(structureId);
-        if (existingText is not null)
+        if (text.Length > 200) text = text[..200];
+
+        var existing = ctx.Db.SignText.StructureId.Find(structureId);
+        if (existing is not null)
         {
-            var st = existingText.Value;
-            st.Text = text;
-            ctx.Db.SignText.StructureId.Update(st);
+            var row = existing.Value;
+            row.Text = text;
+            ctx.Db.SignText.StructureId.Update(row);
         }
         else
         {
             ctx.Db.SignText.Insert(new SignText
             {
                 StructureId = structureId,
-                Text        = text,
+                Text = text,
             });
         }
-
-        Log.Info($"[Interactables] Sign {structureId} updated by {ctx.Sender}.");
     }
 }

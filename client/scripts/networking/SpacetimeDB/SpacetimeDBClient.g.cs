@@ -31,10 +31,12 @@ namespace SpacetimeDB.Types
             AddTable(ChatMessage = new(conn));
             AddTable(ContainerSlot = new(conn));
             AddTable(CraftingRecipe = new(conn));
+            AddTable(FurnaceState = new(conn));
             AddTable(HelloWorldMessage = new(conn));
             AddTable(InventoryItem = new(conn));
             AddTable(PlacedStructure = new(conn));
             AddTable(Player = new(conn));
+            AddTable(SignText = new(conn));
             AddTable(TerrainConfig = new(conn));
             AddTable(WorldItem = new(conn));
             AddTable(WorldObject = new(conn));
@@ -538,10 +540,12 @@ namespace SpacetimeDB.Types
             new QueryBuilder().From.ChatMessage().ToSql(),
             new QueryBuilder().From.ContainerSlot().ToSql(),
             new QueryBuilder().From.CraftingRecipe().ToSql(),
+            new QueryBuilder().From.FurnaceState().ToSql(),
             new QueryBuilder().From.HelloWorldMessage().ToSql(),
             new QueryBuilder().From.InventoryItem().ToSql(),
             new QueryBuilder().From.PlacedStructure().ToSql(),
             new QueryBuilder().From.Player().ToSql(),
+            new QueryBuilder().From.SignText().ToSql(),
             new QueryBuilder().From.TerrainConfig().ToSql(),
             new QueryBuilder().From.WorldItem().ToSql(),
             new QueryBuilder().From.WorldObject().ToSql(),
@@ -555,10 +559,12 @@ namespace SpacetimeDB.Types
         public global::SpacetimeDB.Table<ChatMessage, ChatMessageCols, ChatMessageIxCols> ChatMessage() => new("chat_message", new ChatMessageCols("chat_message"), new ChatMessageIxCols("chat_message"));
         public global::SpacetimeDB.Table<ContainerSlot, ContainerSlotCols, ContainerSlotIxCols> ContainerSlot() => new("container_slot", new ContainerSlotCols("container_slot"), new ContainerSlotIxCols("container_slot"));
         public global::SpacetimeDB.Table<CraftingRecipe, CraftingRecipeCols, CraftingRecipeIxCols> CraftingRecipe() => new("crafting_recipe", new CraftingRecipeCols("crafting_recipe"), new CraftingRecipeIxCols("crafting_recipe"));
+        public global::SpacetimeDB.Table<FurnaceState, FurnaceStateCols, FurnaceStateIxCols> FurnaceState() => new("furnace_state", new FurnaceStateCols("furnace_state"), new FurnaceStateIxCols("furnace_state"));
         public global::SpacetimeDB.Table<HelloWorldMessage, HelloWorldMessageCols, HelloWorldMessageIxCols> HelloWorldMessage() => new("hello_world_message", new HelloWorldMessageCols("hello_world_message"), new HelloWorldMessageIxCols("hello_world_message"));
         public global::SpacetimeDB.Table<InventoryItem, InventoryItemCols, InventoryItemIxCols> InventoryItem() => new("inventory_item", new InventoryItemCols("inventory_item"), new InventoryItemIxCols("inventory_item"));
         public global::SpacetimeDB.Table<PlacedStructure, PlacedStructureCols, PlacedStructureIxCols> PlacedStructure() => new("placed_structure", new PlacedStructureCols("placed_structure"), new PlacedStructureIxCols("placed_structure"));
         public global::SpacetimeDB.Table<Player, PlayerCols, PlayerIxCols> Player() => new("player", new PlayerCols("player"), new PlayerIxCols("player"));
+        public global::SpacetimeDB.Table<SignText, SignTextCols, SignTextIxCols> SignText() => new("sign_text", new SignTextCols("sign_text"), new SignTextIxCols("sign_text"));
         public global::SpacetimeDB.Table<TerrainConfig, TerrainConfigCols, TerrainConfigIxCols> TerrainConfig() => new("terrain_config", new TerrainConfigCols("terrain_config"), new TerrainConfigIxCols("terrain_config"));
         public global::SpacetimeDB.Table<WorldItem, WorldItemCols, WorldItemIxCols> WorldItem() => new("world_item", new WorldItemCols("world_item"), new WorldItemIxCols("world_item"));
         public global::SpacetimeDB.Table<WorldObject, WorldObjectCols, WorldObjectIxCols> WorldObject() => new("world_object", new WorldObjectCols("world_object"), new WorldObjectIxCols("world_object"));
@@ -648,6 +654,9 @@ namespace SpacetimeDB.Types
                 Reducer.ContainerWithdraw args => Reducers.InvokeContainerWithdraw(eventContext, args),
                 Reducer.CraftItem args => Reducers.InvokeCraftItem(eventContext, args),
                 Reducer.DropItem args => Reducers.InvokeDropItem(eventContext, args),
+                Reducer.FurnaceCancelSmelt args => Reducers.InvokeFurnaceCancelSmelt(eventContext, args),
+                Reducer.FurnaceCollect args => Reducers.InvokeFurnaceCollect(eventContext, args),
+                Reducer.FurnaceStartSmelt args => Reducers.InvokeFurnaceStartSmelt(eventContext, args),
                 Reducer.HarvestWorldObject args => Reducers.InvokeHarvestWorldObject(eventContext, args),
                 Reducer.MoveItemToSlot args => Reducers.InvokeMoveItemToSlot(eventContext, args),
                 Reducer.MovePlayer args => Reducers.InvokeMovePlayer(eventContext, args),
@@ -659,6 +668,7 @@ namespace SpacetimeDB.Types
                 Reducer.SetColor args => Reducers.InvokeSetColor(eventContext, args),
                 Reducer.SetName args => Reducers.InvokeSetName(eventContext, args),
                 Reducer.ToggleAccessControl args => Reducers.InvokeToggleAccessControl(eventContext, args),
+                Reducer.UpdateSignText args => Reducers.InvokeUpdateSignText(eventContext, args),
                 _ => throw new ArgumentOutOfRangeException("Reducer", $"Unknown reducer {reducer}")
             };
         }

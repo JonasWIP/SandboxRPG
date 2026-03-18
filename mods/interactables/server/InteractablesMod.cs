@@ -28,8 +28,6 @@ public static partial class Module
         }
     }
 
-    // ---- registration helpers -----------------------------------------------
-
     private static void RegisterContainerTypes()
     {
         ContainerConfig.Register("chest",   16);
@@ -43,157 +41,128 @@ public static partial class Module
 
     private static void RegisterStructureHooks()
     {
-        // ── CHEST ────────────────────────────────────────────────────────────
-        StructureHooks.RegisterOnPlace("chest", (ctx, structure) =>
+        // CHEST: access control on place, drop contents + cleanup on remove
+        StructureHooks.RegisterOnPlace("chest", (ctx, s) =>
         {
             ctx.Db.AccessControl.Insert(new AccessControl
             {
-                StructureId = structure.Id,
-                OwnerId     = structure.OwnerId,
-                IsPublic    = true,
+                EntityId = s.Id,
+                EntityTable = EntityTables.PlacedStructure,
+                OwnerId = s.OwnerId,
+                IsPublic = true,
             });
         });
-
-        StructureHooks.RegisterOnRemove("chest", (ctx, structure) =>
+        StructureHooks.RegisterOnRemove("chest", (ctx, s) =>
         {
-            // Collect slots first to avoid delete-during-iteration
-            var slotsToDelete = new List<ContainerSlot>();
-            foreach (var slot in ctx.Db.ContainerSlot.Iter())
+            var toDelete = new List<ContainerSlot>();
+            foreach (var cs in ctx.Db.ContainerSlot.Iter())
+                if (cs.ContainerId == s.Id && cs.ContainerTable == EntityTables.PlacedStructure)
+                    toDelete.Add(cs);
+            foreach (var cs in toDelete)
             {
-                if (slot.ContainerId == structure.Id)
-                    slotsToDelete.Add(slot);
-            }
-
-            // Drop contents as world items
-            foreach (var slot in slotsToDelete)
-            {
-                ctx.Db.WorldItem.Insert(new WorldItem
+                if (!string.IsNullOrEmpty(cs.ItemType) && cs.Quantity > 0)
                 {
-                    ItemType = slot.ItemType,
-                    Quantity = slot.Quantity,
-                    PosX     = structure.PosX,
-                    PosY     = structure.PosY + 0.5f,
-                    PosZ     = structure.PosZ,
-                });
-                ctx.Db.ContainerSlot.Delete(slot);
+                    ctx.Db.WorldItem.Insert(new WorldItem
+                    {
+                        ItemType = cs.ItemType, Quantity = cs.Quantity,
+                        PosX = s.PosX, PosY = s.PosY, PosZ = s.PosZ,
+                    });
+                }
+                ctx.Db.ContainerSlot.Delete(cs);
             }
-
-            // Remove access control
-            var ac = ctx.Db.AccessControl.StructureId.Find(structure.Id);
+            var ac = AccessControlHelper.Find(ctx, s.Id, EntityTables.PlacedStructure);
             if (ac is not null) ctx.Db.AccessControl.Delete(ac.Value);
         });
 
-        // ── FURNACE ──────────────────────────────────────────────────────────
-        StructureHooks.RegisterOnPlace("furnace", (ctx, structure) =>
+        // FURNACE: access control + furnace state cleanup
+        StructureHooks.RegisterOnPlace("furnace", (ctx, s) =>
         {
             ctx.Db.AccessControl.Insert(new AccessControl
             {
-                StructureId = structure.Id,
-                OwnerId     = structure.OwnerId,
-                IsPublic    = true,
+                EntityId = s.Id,
+                EntityTable = EntityTables.PlacedStructure,
+                OwnerId = s.OwnerId,
+                IsPublic = true,
             });
         });
-
-        StructureHooks.RegisterOnRemove("furnace", (ctx, structure) =>
+        StructureHooks.RegisterOnRemove("furnace", (ctx, s) =>
         {
-            // Collect container slots first
-            var slotsToDelete = new List<ContainerSlot>();
-            foreach (var slot in ctx.Db.ContainerSlot.Iter())
+            var toDelete = new List<ContainerSlot>();
+            foreach (var cs in ctx.Db.ContainerSlot.Iter())
+                if (cs.ContainerId == s.Id && cs.ContainerTable == EntityTables.PlacedStructure)
+                    toDelete.Add(cs);
+            foreach (var cs in toDelete)
             {
-                if (slot.ContainerId == structure.Id)
-                    slotsToDelete.Add(slot);
-            }
-
-            // Drop contents as world items
-            foreach (var slot in slotsToDelete)
-            {
-                ctx.Db.WorldItem.Insert(new WorldItem
+                if (!string.IsNullOrEmpty(cs.ItemType) && cs.Quantity > 0)
                 {
-                    ItemType = slot.ItemType,
-                    Quantity = slot.Quantity,
-                    PosX     = structure.PosX,
-                    PosY     = structure.PosY + 0.5f,
-                    PosZ     = structure.PosZ,
-                });
-                ctx.Db.ContainerSlot.Delete(slot);
+                    ctx.Db.WorldItem.Insert(new WorldItem
+                    {
+                        ItemType = cs.ItemType, Quantity = cs.Quantity,
+                        PosX = s.PosX, PosY = s.PosY, PosZ = s.PosZ,
+                    });
+                }
+                ctx.Db.ContainerSlot.Delete(cs);
             }
-
-            // Clean up furnace state
-            var fs = ctx.Db.FurnaceState.StructureId.Find(structure.Id);
+            var fs = ctx.Db.FurnaceState.StructureId.Find(s.Id);
             if (fs is not null) ctx.Db.FurnaceState.Delete(fs.Value);
-
-            // Remove access control
-            var ac = ctx.Db.AccessControl.StructureId.Find(structure.Id);
+            var ac = AccessControlHelper.Find(ctx, s.Id, EntityTables.PlacedStructure);
             if (ac is not null) ctx.Db.AccessControl.Delete(ac.Value);
         });
 
-        // ── CRAFTING TABLE ───────────────────────────────────────────────────
-        StructureHooks.RegisterOnPlace("crafting_table", (ctx, structure) =>
+        // CRAFTING TABLE: just access control
+        StructureHooks.RegisterOnPlace("crafting_table", (ctx, s) =>
         {
             ctx.Db.AccessControl.Insert(new AccessControl
             {
-                StructureId = structure.Id,
-                OwnerId     = structure.OwnerId,
-                IsPublic    = true,
+                EntityId = s.Id,
+                EntityTable = EntityTables.PlacedStructure,
+                OwnerId = s.OwnerId,
+                IsPublic = true,
             });
         });
-
-        StructureHooks.RegisterOnRemove("crafting_table", (ctx, structure) =>
+        StructureHooks.RegisterOnRemove("crafting_table", (ctx, s) =>
         {
-            var ac = ctx.Db.AccessControl.StructureId.Find(structure.Id);
+            var ac = AccessControlHelper.Find(ctx, s.Id, EntityTables.PlacedStructure);
             if (ac is not null) ctx.Db.AccessControl.Delete(ac.Value);
         });
 
-        // ── SIGN ─────────────────────────────────────────────────────────────
-        StructureHooks.RegisterOnPlace("sign", (ctx, structure) =>
+        // SIGN: access control + sign text
+        StructureHooks.RegisterOnPlace("sign", (ctx, s) =>
         {
+            ctx.Db.SignText.Insert(new SignText { StructureId = s.Id, Text = "" });
             ctx.Db.AccessControl.Insert(new AccessControl
             {
-                StructureId = structure.Id,
-                OwnerId     = structure.OwnerId,
-                IsPublic    = false,
-            });
-            ctx.Db.SignText.Insert(new SignText
-            {
-                StructureId = structure.Id,
-                Text        = "",
+                EntityId = s.Id,
+                EntityTable = EntityTables.PlacedStructure,
+                OwnerId = s.OwnerId,
+                IsPublic = true,
             });
         });
-
-        StructureHooks.RegisterOnRemove("sign", (ctx, structure) =>
+        StructureHooks.RegisterOnRemove("sign", (ctx, s) =>
         {
-            var st = ctx.Db.SignText.StructureId.Find(structure.Id);
+            var st = ctx.Db.SignText.StructureId.Find(s.Id);
             if (st is not null) ctx.Db.SignText.Delete(st.Value);
-
-            var ac = ctx.Db.AccessControl.StructureId.Find(structure.Id);
+            var ac = AccessControlHelper.Find(ctx, s.Id, EntityTables.PlacedStructure);
             if (ac is not null) ctx.Db.AccessControl.Delete(ac.Value);
         });
     }
 
     private static void SeedCraftingTableRecipes(ReducerContext ctx)
     {
-        // Add crafting-table-specific recipes not already provided by BaseMod.
         ctx.Db.CraftingRecipe.Insert(new CraftingRecipe
         {
-            ResultItemType   = "furnace",
-            ResultQuantity   = 1,
-            Ingredients      = "stone:8,iron:2",
-            CraftTimeSeconds = 5f,
+            ResultItemType = "furnace", ResultQuantity = 1,
+            Ingredients = "stone:8,iron:2", CraftTimeSeconds = 5f, Station = "",
         });
         ctx.Db.CraftingRecipe.Insert(new CraftingRecipe
         {
-            ResultItemType   = "crafting_table",
-            ResultQuantity   = 1,
-            Ingredients      = "wood:10,iron:2",
-            CraftTimeSeconds = 6f,
+            ResultItemType = "crafting_table", ResultQuantity = 1,
+            Ingredients = "wood:10,iron:2", CraftTimeSeconds = 6f, Station = "",
         });
         ctx.Db.CraftingRecipe.Insert(new CraftingRecipe
         {
-            ResultItemType   = "sign",
-            ResultQuantity   = 1,
-            Ingredients      = "wood:2",
-            CraftTimeSeconds = 1f,
+            ResultItemType = "sign", ResultQuantity = 1,
+            Ingredients = "wood:2", CraftTimeSeconds = 1f, Station = "",
         });
-        Log.Info("[InteractablesMod] Seeded crafting table recipes.");
     }
 }
