@@ -48,17 +48,39 @@ public partial class InteractionSystem : Node
         if (collider == null) { HideHint(); return; }
 
         var interactable = FindInteractable(collider);
-        if (interactable == null) { HideHint(); return; }
+        var attackable = FindAttackable(collider);
+
+        if (interactable == null && attackable == null) { HideHint(); return; }
 
         var player = GameManager.Instance.GetLocalPlayer();
 
-        if (!interactable.CanInteract(player))
-        { ShowHint("[Private]"); return; }
+        // Interaction takes priority for hint display
+        if (interactable != null && interactable.CanInteract(player))
+        {
+            string hint = interactable.HintText;
+            if (attackable != null && attackable.CanAttack(player))
+                hint += $"\n{attackable.AttackHintText}";
+            ShowHint(hint);
 
-        ShowHint(interactable.HintText);
-
-        if (Input.IsActionJustPressed(interactable.InteractAction))
-            interactable.Interact(player);
+            if (Input.IsActionJustPressed(interactable.InteractAction))
+                interactable.Interact(player);
+            if (attackable != null && Input.IsActionJustPressed("primary_attack") && attackable.CanAttack(player))
+                attackable.Attack(player);
+        }
+        else if (attackable != null && attackable.CanAttack(player))
+        {
+            ShowHint(attackable.AttackHintText);
+            if (Input.IsActionJustPressed("primary_attack"))
+                attackable.Attack(player);
+        }
+        else if (interactable != null)
+        {
+            ShowHint("[Private]");
+        }
+        else
+        {
+            HideHint();
+        }
     }
 
     private static IInteractable? FindInteractable(Node node)
@@ -68,6 +90,18 @@ public partial class InteractionSystem : Node
         {
             if (current is IInteractable interactable)
                 return interactable;
+            current = current.GetParent();
+        }
+        return null;
+    }
+
+    private static IAttackable? FindAttackable(Node node)
+    {
+        Node? current = node;
+        for (int i = 0; i < 4 && current != null; i++)
+        {
+            if (current is IAttackable attackable)
+                return attackable;
             current = current.GetParent();
         }
         return null;
