@@ -26,6 +26,15 @@ public static partial class Module
         uint damage    = HarvestConfig.GetToolDamage(toolType, o.ObjectType);
         uint newHealth = o.Health <= damage ? 0 : o.Health - damage;
 
+        // Emit damage event for client-side damage numbers
+        ctx.Db.DamageEvent.Insert(new DamageEvent
+        {
+            SourceId = 0, SourceType = "player",
+            TargetId = id, TargetType = "world_object",
+            Amount = (int)damage, DamageType = "harvest",
+            Timestamp = (ulong)((DateTimeOffset)ctx.Timestamp).ToUnixTimeMilliseconds(),
+        });
+
         ctx.Db.WorldObject.Delete(o);
 
         if (newHealth == 0)
