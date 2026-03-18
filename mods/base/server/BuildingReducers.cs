@@ -41,6 +41,20 @@ public static partial class Module
             MaxHealth = maxHealth,
         });
 
+        // Find the just-inserted structure to get its auto-incremented ID
+        PlacedStructure? inserted = null;
+        foreach (var ps in ctx.Db.PlacedStructure.Iter())
+        {
+            if (ps.OwnerId == identity && ps.StructureType == structureType
+                && ps.PosX == posX && ps.PosY == posY && ps.PosZ == posZ)
+            {
+                inserted = ps;
+                break;
+            }
+        }
+        if (inserted is not null)
+            StructureHooks.RunOnPlace(ctx, inserted.Value);
+
         // Consume one item
         var item = foundItem.Value;
         if (item.Quantity <= 1)
@@ -73,6 +87,7 @@ public static partial class Module
             Slot = -1,
         });
 
+        StructureHooks.RunOnRemove(ctx, s);
         ctx.Db.PlacedStructure.Delete(s);
     }
 }
