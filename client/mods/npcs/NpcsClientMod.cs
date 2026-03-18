@@ -21,28 +21,20 @@ public partial class NpcsClientMod : Node, IClientMod
     {
         GameManager.Instance.DamageEventReceived += (long eventId) =>
         {
-            var events = GameManager.Instance.GetRecentDamageEvents();
-            foreach (var evt in events)
-            {
-                if ((long)evt.Id != eventId) continue;
+            if (!IsInstanceValid(sceneRoot)) return;
 
-                Vector3 pos;
-                if (evt.TargetType == "npc")
-                {
-                    var npc = GameManager.Instance.GetNpc(evt.TargetId);
-                    if (npc is null) break;
-                    pos = new Vector3(npc.PosX, npc.PosY, npc.PosZ);
-                }
-                else
-                {
-                    // Player damage — skip for now (player health bars show damage)
-                    break;
-                }
+            var evt = GameManager.Instance.GetDamageEvent((ulong)eventId);
+            if (evt is null) return;
 
-                var effect = DamageNumberEffect.Create(evt.Amount, pos);
-                sceneRoot.AddChild(effect);
-                break;
-            }
+            if (evt.TargetType != "npc") return; // Player damage — skip (player health bars show damage)
+
+            var npc = GameManager.Instance.GetNpc(evt.TargetId);
+            if (npc is null) return;
+
+            var pos = new Vector3(npc.PosX, npc.PosY, npc.PosZ);
+            var effect = DamageNumberEffect.Create(evt.Amount);
+            sceneRoot.AddChild(effect);
+            effect.GlobalPosition = pos + new Vector3(0, 2.5f, 0);
         };
     }
 }

@@ -8,7 +8,7 @@ public partial class DamageNumberEffect : Label3D
     private float _age;
     private Vector3 _velocity;
 
-    public static DamageNumberEffect Create(int amount, Vector3 worldPos)
+    public static DamageNumberEffect Create(int amount)
     {
         var effect = new DamageNumberEffect
         {
@@ -16,7 +16,6 @@ public partial class DamageNumberEffect : Label3D
             FontSize = 36,
             Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
             NoDepthTest = true,
-            GlobalPosition = worldPos + new Vector3(0, 2.5f, 0),
             Modulate = amount > 15 ? Colors.Orange : Colors.White,
         };
         effect._velocity = new Vector3(

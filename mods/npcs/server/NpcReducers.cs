@@ -93,6 +93,9 @@ public static partial class Module
     {
         if (!IsService(ctx)) return;
 
+        // Player damage is handled by NpcDealDamageToPlayer (players are keyed by Identity, not ulong)
+        if (targetType == "player") return;
+
         // Insert damage event
         ctx.Db.DamageEvent.Insert(new DamageEvent
         {
@@ -101,9 +104,6 @@ public static partial class Module
             Amount = amount, DamageType = damageType,
             Timestamp = NowMs(ctx),
         });
-
-        // Player damage is handled by NpcDealDamageToPlayer (players are keyed by Identity, not ulong)
-        if (targetType == "player") return;
 
         if (targetType == "npc")
         {

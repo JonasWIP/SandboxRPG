@@ -21,18 +21,19 @@ public partial class NpcEntity : StaticBody3D, IInteractable, IAttackable
     private StandardMaterial3D _material = null!;
     private ProgressBar? _healthBar;
     private SubViewport? _healthBarViewport;
+    private Sprite3D? _healthSprite;
+    private NpcConfig? _cachedConfig;
+    private NpcVisualDef? _cachedVisual;
 
     // IInteractable — for dialogue/trade NPCs
     public string HintText
     {
         get
         {
-            var cfg = GameManager.Instance.GetNpcConfig(NpcType);
-            if (cfg is null) return "";
-            var visual = NpcVisualRegistry.Get(NpcType);
-            string name = visual?.DisplayName ?? NpcType;
-            if (cfg.IsTrader) return $"[E] Trade with {name}";
-            if (cfg.HasDialogue) return $"[E] Talk to {name}";
+            if (_cachedConfig is null) return "";
+            string name = _cachedVisual?.DisplayName ?? NpcType;
+            if (_cachedConfig.IsTrader) return $"[E] Trade with {name}";
+            if (_cachedConfig.HasDialogue) return $"[E] Talk to {name}";
             return "";
         }
     }
@@ -40,17 +41,15 @@ public partial class NpcEntity : StaticBody3D, IInteractable, IAttackable
     public bool CanInteract(Player? player)
     {
         if (!NpcIsAlive) return false;
-        var cfg = GameManager.Instance.GetNpcConfig(NpcType);
-        return cfg is not null && (cfg.IsTrader || cfg.HasDialogue);
+        return _cachedConfig is not null && (_cachedConfig.IsTrader || _cachedConfig.HasDialogue);
     }
 
     public void Interact(Player? player)
     {
-        var cfg = GameManager.Instance.GetNpcConfig(NpcType);
-        if (cfg is null) return;
-        if (cfg.IsTrader)
+        if (_cachedConfig is null) return;
+        if (_cachedConfig.IsTrader)
             UIManager.Instance.Push(new NpcTradePanel(NpcId, NpcType));
-        else if (cfg.HasDialogue)
+        else if (_cachedConfig.HasDialogue)
             UIManager.Instance.Push(new NpcDialoguePanel(NpcType));
     }
 
@@ -59,8 +58,7 @@ public partial class NpcEntity : StaticBody3D, IInteractable, IAttackable
     {
         get
         {
-            var visual = NpcVisualRegistry.Get(NpcType);
-            string name = visual?.DisplayName ?? NpcType;
+            string name = _cachedVisual?.DisplayName ?? NpcType;
             return $"[LMB] Attack {name}";
         }
     }
@@ -68,8 +66,7 @@ public partial class NpcEntity : StaticBody3D, IInteractable, IAttackable
     public bool CanAttack(Player? player)
     {
         if (!NpcIsAlive) return false;
-        var cfg = GameManager.Instance.GetNpcConfig(NpcType);
-        return cfg is not null && cfg.IsAttackable;
+        return _cachedConfig is not null && _cachedConfig.IsAttackable;
     }
 
     public void Attack(Player? player)
@@ -79,7 +76,10 @@ public partial class NpcEntity : StaticBody3D, IInteractable, IAttackable
 
     public override void _Ready()
     {
-        var visual = NpcVisualRegistry.Get(NpcType);
+        _cachedConfig = GameManager.Instance.GetNpcConfig(NpcType);
+        _cachedVisual = NpcVisualRegistry.Get(NpcType);
+
+        var visual = _cachedVisual;
         float scale = visual?.Scale ?? 1.0f;
         var tint = visual?.TintColor ?? Colors.Gray;
 
@@ -121,38 +121,17 @@ public partial class NpcEntity : StaticBody3D, IInteractable, IAttackable
 
     private void CreateHealthBar(float scale)
     {
-        _healthBarViewport = new SubViewport
-        {
-            Size = new Vector2I(100, 12),
-            TransparentBg = true,
-            RenderTargetUpdateMode = SubViewport.UpdateMode.Always,
-        };
-        _healthBar = new ProgressBar
-        {
-            MinValue = 0, MaxValue = NpcMaxHealth, Value = NpcHealth,
-            ShowPercentage = false,
-            CustomMinimumSize = new Vector2(100, 12),
-            Position = Vector2.Zero,
-        };
-        // Style the bar
-        var bgStyle = new StyleBoxFlat { BgColor = new Color(0.2f, 0.2f, 0.2f, 0.8f) };
-        var fillStyle = new StyleBoxFlat { BgColor = NpcVisualRegistry.Get(NpcType)?.HealthBarColor ?? Colors.Red };
-        _healthBar.AddThemeStyleboxOverride("background", bgStyle);
-        _healthBar.AddThemeStyleboxOverride("fill", fillStyle);
-        _healthBarViewport.AddChild(_healthBar);
+        var fillColor = _cachedVisual?.HealthBarColor ?? Colors.Red;
+        (_healthBarViewport, _healthBar, _healthSprite) = HealthBarFactory.Create(
+            width: 100, height: 12,
+            fillColor: fillColor,
+            pixelSize: 0.01f,
+            yOffset: 2.0f * scale,
+            maxValue: NpcMaxHealth,
+            currentValue: NpcHealth,
+            initiallyVisible: false);
         AddChild(_healthBarViewport);
-
-        var healthSprite = new Sprite3D
-        {
-            Name = "HealthBarSprite",
-            Texture = _healthBarViewport.GetTexture(),
-            Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
-            NoDepthTest = true,
-            PixelSize = 0.01f,
-            Position = new Vector3(0, 2.0f * scale, 0),
-            Visible = false, // hidden until damaged
-        };
-        AddChild(healthSprite);
+        AddChild(_healthSprite);
     }
 
     private bool _deathHandled;
@@ -166,8 +145,7 @@ public partial class NpcEntity : StaticBody3D, IInteractable, IAttackable
             {
                 _deathHandled = true;
                 _nameLabel.Visible = false;
-                var healthSprite = GetNodeOrNull<Sprite3D>("HealthBarSprite");
-                if (healthSprite != null) healthSprite.Visible = false;
+                if (_healthSprite != null) _healthSprite.Visible = false;
                 _material.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
             }
 
@@ -207,8 +185,7 @@ public partial class NpcEntity : StaticBody3D, IInteractable, IAttackable
             Visible = true;
             _nameLabel.Visible = true;
             _material.Transparency = BaseMaterial3D.TransparencyEnum.Disabled;
-            var tint = NpcVisualRegistry.Get(NpcType)?.TintColor ?? Colors.Gray;
-            _material.AlbedoColor = tint;
+            _material.AlbedoColor = _cachedVisual?.TintColor ?? Colors.Gray;
         }
 
         NpcIsAlive = npc.IsAlive;
@@ -220,8 +197,7 @@ public partial class NpcEntity : StaticBody3D, IInteractable, IAttackable
             _healthBar.Value = npc.Health;
         }
         // Show health bar only when damaged
-        var healthSprite = GetNodeOrNull<Sprite3D>("HealthBarSprite");
-        if (healthSprite != null)
-            healthSprite.Visible = npc.IsAlive && npc.Health < npc.MaxHealth;
+        if (_healthSprite != null)
+            _healthSprite.Visible = npc.IsAlive && npc.Health < npc.MaxHealth;
     }
 }

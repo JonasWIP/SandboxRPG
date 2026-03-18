@@ -14,7 +14,7 @@ public class SpawnManager
     // Track death times for respawn delay
     private readonly Dictionary<ulong, DateTimeOffset> _deathTimes = new();
     // Track pending spawns to avoid over-spawning before subscription confirms
-    private readonly Dictionary<string, int> _pendingSpawns = new();
+    private readonly Dictionary<ulong, int> _pendingSpawns = new();
     private bool _loggedOnce;
 
     public SpawnManager(
@@ -48,7 +48,7 @@ public class SpawnManager
             // Count alive NPCs of this type in this zone
             int aliveCount = 0;
             var deadInZone = new List<Npc>();
-            string ruleKey = $"{rule.NpcType}_{rule.ZoneX}_{rule.ZoneZ}";
+            ulong ruleKey = rule.Id;
             int pending = _pendingSpawns.GetValueOrDefault(ruleKey, 0);
 
             foreach (var npc in npcs)

@@ -175,6 +175,7 @@ public partial class GameManager : Node
 	public IEnumerable<Npc> GetAllNpcs() { if (Conn != null) foreach (var n in Conn.Db.Npc.Iter()) yield return n; }
 	public Npc? GetNpc(ulong id) => Conn?.Db.Npc.Id.Find(id);
 	public IEnumerable<DamageEvent> GetRecentDamageEvents() { if (Conn != null) foreach (var e in Conn.Db.DamageEvent.Iter()) yield return e; }
+	public DamageEvent? GetDamageEvent(ulong id) => Conn?.Db.DamageEvent.Id.Find(id);
 	public NpcConfig? GetNpcConfig(string npcType)
 	{
 		if (Conn == null) return null;

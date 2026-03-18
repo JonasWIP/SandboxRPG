@@ -36,25 +36,6 @@ public partial class HarvestableObject : StaticBody3D, IInteractable
 
     private void CreateHealthBar()
     {
-        _healthBarViewport = new SubViewport
-        {
-            Size = new Vector2I(80, 8),
-            TransparentBg = true,
-            RenderTargetUpdateMode = SubViewport.UpdateMode.Always,
-        };
-        _healthBar = new ProgressBar
-        {
-            MinValue = 0, MaxValue = MaxHealth, Value = Health,
-            ShowPercentage = false,
-            CustomMinimumSize = new Vector2(80, 8),
-        };
-        var bgStyle = new StyleBoxFlat { BgColor = new Color(0.2f, 0.2f, 0.2f, 0.7f) };
-        var fillStyle = new StyleBoxFlat { BgColor = new Color(0.2f, 0.8f, 0.2f) };
-        _healthBar.AddThemeStyleboxOverride("background", bgStyle);
-        _healthBar.AddThemeStyleboxOverride("fill", fillStyle);
-        _healthBarViewport.AddChild(_healthBar);
-        AddChild(_healthBarViewport);
-
         // Position above the object — estimate height from object type
         float barY = ObjectType switch
         {
@@ -66,16 +47,16 @@ public partial class HarvestableObject : StaticBody3D, IInteractable
             _ => 2.0f,
         };
 
-        _healthSprite = new Sprite3D
-        {
-            Name = "HealthBarSprite",
-            Texture = _healthBarViewport.GetTexture(),
-            Billboard = BaseMaterial3D.BillboardModeEnum.Enabled,
-            NoDepthTest = true,
-            PixelSize = 0.01f,
-            Position = new Vector3(0, barY, 0),
-            Visible = Health < MaxHealth, // only show when damaged
-        };
+        (_healthBarViewport, _healthBar, _healthSprite) = HealthBarFactory.Create(
+            width: 80, height: 8,
+            fillColor: new Color(0.2f, 0.8f, 0.2f),
+            pixelSize: 0.01f,
+            yOffset: barY,
+            maxValue: MaxHealth,
+            currentValue: Health,
+            initiallyVisible: Health < MaxHealth,
+            bgAlpha: 0.7f);
+        AddChild(_healthBarViewport);
         AddChild(_healthSprite);
     }
 }
