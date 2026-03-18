@@ -15,6 +15,7 @@ public static class ModLoader
 
     public static void RunAll(ReducerContext ctx)
     {
+        Log.Info($"[ModLoader] RunAll called. Registered mods: {_mods.Count}");
         foreach (var mod in Sorted())
         {
             Log.Info($"[ModLoader] Seeding mod: {mod.Name} v{mod.Version}");

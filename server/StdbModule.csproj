@@ -15,9 +15,9 @@
   </ItemGroup>
   <!-- Mods: add one line per enabled mod -->
   <ItemGroup>
-    <Compile Include="../mods/base/server/**/*.cs" />
+    <Compile Include="../mods/base/server/**/*.cs" Exclude="../mods/base/server/tests/**/*.cs" />
     <Compile Include="../mods/hello-world/server/**/*.cs" Exclude="../mods/hello-world/server/tests/**/*.cs" />
-    <Compile Include="../mods/interactables/server/**/*.cs" />
-    <Compile Include="../mods/currency/server/**/*.cs" />
+    <Compile Include="../mods/interactables/server/**/*.cs" Exclude="../mods/interactables/server/tests/**/*.cs" />
+    <Compile Include="../mods/currency/server/**/*.cs" Exclude="../mods/currency/server/tests/**/*.cs" />
   </ItemGroup>
 </Project>
