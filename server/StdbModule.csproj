@@ -17,5 +17,6 @@
   <ItemGroup>
     <Compile Include="../mods/base/server/**/*.cs" />
     <Compile Include="../mods/hello-world/server/**/*.cs" Exclude="../mods/hello-world/server/tests/**/*.cs" />
+    <Compile Include="../mods/interactables/server/**/*.cs" />
   </ItemGroup>
 </Project>

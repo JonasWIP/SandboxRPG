@@ -54,6 +54,9 @@ public static partial class Module
         StructureConfig.Register("campfire",     50f);
         StructureConfig.Register("workbench",   100f);
         StructureConfig.Register("chest",        80f);
+        StructureConfig.Register("furnace",        80f);
+        StructureConfig.Register("crafting_table", 100f);
+        StructureConfig.Register("sign",            30f);
     }
 
     private static void RegisterHarvest()

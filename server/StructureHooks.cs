@@ -5,43 +5,36 @@ using SpacetimeDB;
 
 namespace SandboxRPG.Server;
 
-public static partial class Module
+/// <summary>
+/// Callback registry for structure placement and removal events.
+/// Mods register hooks during Seed(); BuildingReducers fires them.
+/// </summary>
+public static class StructureHooks
 {
-    public static class StructureHooks
+    private static readonly Dictionary<string, Action<ReducerContext, Module.PlacedStructure>> _onPlace  = new();
+    private static readonly Dictionary<string, Action<ReducerContext, Module.PlacedStructure>> _onRemove = new();
+
+    public static void RegisterOnPlace(string structureType, Action<ReducerContext, Module.PlacedStructure> handler)
+        => _onPlace[structureType] = handler;
+
+    public static void RegisterOnRemove(string structureType, Action<ReducerContext, Module.PlacedStructure> handler)
+        => _onRemove[structureType] = handler;
+
+    public static void FireOnPlace(ReducerContext ctx, Module.PlacedStructure structure)
     {
-        private static readonly Dictionary<string, List<Action<ReducerContext, PlacedStructure>>> _onPlace = new();
-        private static readonly Dictionary<string, List<Action<ReducerContext, PlacedStructure>>> _onRemove = new();
+        if (_onPlace.TryGetValue(structure.StructureType, out var handler))
+            handler(ctx, structure);
+    }
 
-        public static void RegisterOnPlace(string structureType, Action<ReducerContext, PlacedStructure> hook)
-        {
-            if (!_onPlace.ContainsKey(structureType))
-                _onPlace[structureType] = new();
-            _onPlace[structureType].Add(hook);
-        }
+    public static void FireOnRemove(ReducerContext ctx, Module.PlacedStructure structure)
+    {
+        if (_onRemove.TryGetValue(structure.StructureType, out var handler))
+            handler(ctx, structure);
+    }
 
-        public static void RegisterOnRemove(string structureType, Action<ReducerContext, PlacedStructure> hook)
-        {
-            if (!_onRemove.ContainsKey(structureType))
-                _onRemove[structureType] = new();
-            _onRemove[structureType].Add(hook);
-        }
-
-        public static void RunOnPlace(ReducerContext ctx, PlacedStructure structure)
-        {
-            if (_onPlace.TryGetValue(structure.StructureType, out var hooks))
-                foreach (var hook in hooks) hook(ctx, structure);
-        }
-
-        public static void RunOnRemove(ReducerContext ctx, PlacedStructure structure)
-        {
-            if (_onRemove.TryGetValue(structure.StructureType, out var hooks))
-                foreach (var hook in hooks) hook(ctx, structure);
-        }
-
-        public static void Clear()
-        {
-            _onPlace.Clear();
-            _onRemove.Clear();
-        }
+    public static void Clear()
+    {
+        _onPlace.Clear();
+        _onRemove.Clear();
     }
 }
