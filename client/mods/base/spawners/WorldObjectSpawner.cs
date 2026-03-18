@@ -60,7 +60,12 @@ public class WorldObjectSpawner
     private static Node3D CreateWorldObjectVisual(WorldObject obj)
     {
         var def   = ObjectRegistry.Get(obj.ObjectType);
-        var body  = new StaticBody3D { Name = $"WorldObject_{obj.Id}" };
+        var body  = new HarvestableObject
+        {
+            Name = $"WorldObject_{obj.Id}",
+            WorldObjectId = obj.Id,
+            ObjectType = obj.ObjectType,
+        };
         float scale = def?.Scale ?? 1.0f;
 
         if (def is not null && !string.IsNullOrEmpty(def.ModelPath) && ResourceLoader.Exists(def.ModelPath))
@@ -104,8 +109,6 @@ public class WorldObjectSpawner
         body.Position = new Vector3(obj.PosX, groundY, obj.PosZ);
         body.Rotation = new Vector3(0, obj.RotY, 0);
         body.AddToGroup("world_object");
-        body.SetMeta("world_object_id", (long)obj.Id);
-        body.SetMeta("object_type", obj.ObjectType);
         return body;
     }
 
