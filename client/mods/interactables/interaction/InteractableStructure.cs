@@ -40,7 +40,7 @@ public partial class InteractableStructure : StaticBody3D, IInteractable
 
         // Public structures (or structures the player owns) are always accessible.
         var ac = GameManager.Instance.GetAccessControl(StructureId, "placed_structure");
-        if (ac == null) return true;          // no access control record → public
+        if (ac is null) return true;          // no access control record → public
         if (ac.IsPublic) return true;         // explicitly public
         if (ac.OwnerId == player.Identity) return true; // owner always has access
         return false;
@@ -55,7 +55,7 @@ public partial class InteractableStructure : StaticBody3D, IInteractable
             "chest"          => new ContainerPanel(StructureId, "placed_structure", 16, "Chest"),
             "furnace"        => new FurnacePanel(StructureId),
             "crafting_table" => new CraftingTablePanel(),
-            "sign"           => new SignPanel(StructureId, isOwner),
+            "sign"           => new SignPanel(StructureId),
             _                => new ContainerPanel(StructureId, "placed_structure", 16),
         };
 
