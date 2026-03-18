@@ -17,6 +17,7 @@ public static partial class Module
         _ = _helloWorldMod;
         _ = _interactablesMod;
         _ = _currencyMod;
+        _ = _npcsMod;
         ModLoader.RunAll(ctx);
     }
 
