@@ -24,6 +24,7 @@ public static partial class Module
             RegisterSmeltRecipes();
             RegisterStructureHooks();
             SeedCraftingTableRecipes(ctx);
+            SeedDemoStructures(ctx);
             Log.Info("[InteractablesMod] Seeded.");
         }
     }
@@ -115,6 +116,30 @@ public static partial class Module
             if (st is not null) ctx.Db.SignText.Delete(st.Value);
             RemoveAccessControl(ctx, s);
         });
+    }
+
+    /// <summary>Places demo interactable structures near spawn for testing.</summary>
+    private static void SeedDemoStructures(ReducerContext ctx)
+    {
+        var owner = ctx.Sender;
+        void Place(string type, float x, float z)
+        {
+            float maxHp = StructureConfig.GetMaxHealth(type);
+            var s = ctx.Db.PlacedStructure.Insert(new PlacedStructure
+            {
+                OwnerId = owner,
+                StructureType = type,
+                PosX = x, PosY = 0f, PosZ = z, RotY = 0f,
+                Health = maxHp, MaxHealth = maxHp,
+            });
+            StructureHooks.FireOnPlace(ctx, s);
+        }
+
+        Place("chest",          3f, -3f);
+        Place("furnace",        5f, -3f);
+        Place("crafting_table", 7f, -3f);
+        Place("sign",           9f, -3f);
+        Log.Info("[InteractablesMod] Demo structures placed near spawn.");
     }
 
     private static void SeedCraftingTableRecipes(ReducerContext ctx)
