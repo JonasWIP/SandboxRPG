@@ -95,6 +95,8 @@ public static class GameService
     {
         float delta = TickRateMs / 1000f;
 
+        try
+        {
         // Spawn/respawn NPCs
         _spawnManager?.Tick();
 
@@ -138,6 +140,11 @@ public static class GameService
         {
             _conn.Reducers.CleanupDamageEvents();
             _lastCleanupMs = nowMs;
+        }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[GameService] Tick error: {ex}");
         }
     }
 }

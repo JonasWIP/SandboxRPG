@@ -15,6 +15,7 @@ public class SpawnManager
     private readonly Dictionary<ulong, DateTimeOffset> _deathTimes = new();
     // Track pending spawns to avoid over-spawning before subscription confirms
     private readonly Dictionary<string, int> _pendingSpawns = new();
+    private bool _loggedOnce;
 
     public SpawnManager(
         Func<IEnumerable<NpcSpawnRule>> getSpawnRules,
@@ -32,8 +33,17 @@ public class SpawnManager
     {
         var npcs = _getNpcs().ToList();
         var now = DateTimeOffset.UtcNow;
+        var rules = _getSpawnRules().ToList();
 
-        foreach (var rule in _getSpawnRules())
+        if (!_loggedOnce)
+        {
+            Console.WriteLine($"[SpawnManager] First tick: {rules.Count} spawn rules, {npcs.Count} existing NPCs");
+            foreach (var r in rules)
+                Console.WriteLine($"  Rule: {r.NpcType} at ({r.ZoneX},{r.ZoneZ}) radius={r.ZoneRadius} max={r.MaxCount}");
+            _loggedOnce = true;
+        }
+
+        foreach (var rule in rules)
         {
             // Count alive NPCs of this type in this zone
             int aliveCount = 0;
