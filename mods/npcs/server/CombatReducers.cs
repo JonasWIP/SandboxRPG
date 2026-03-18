@@ -23,18 +23,18 @@ public static partial class Module
         var cfg = FindNpcConfig(ctx, npc.NpcType);
         if (cfg is null || !cfg.Value.IsAttackable) return;
 
-        // Range check (3.0 units)
+        // Range check
         float dx = p.PosX - npc.PosX;
         float dz = p.PosZ - npc.PosZ;
         float distSq = dx * dx + dz * dz;
-        if (distSq > 3.0f * 3.0f) return;
+        if (distSq > GameConstants.MeleeAttackRangeSq) return;
 
-        // Damage: 10 base (fists), 25 if player has iron_sword
-        int damage = 10;
+        // Damage: base (fists) or sword
+        int damage = GameConstants.BaseMeleeDamage;
         foreach (var item in ctx.Db.InventoryItem.Iter())
         {
             if (item.OwnerId == ctx.Sender && item.ItemType == "iron_sword")
-            { damage = 25; break; }
+            { damage = GameConstants.SwordDamage; break; }
         }
 
         // Insert damage event

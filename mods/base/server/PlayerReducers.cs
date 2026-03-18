@@ -12,8 +12,8 @@ public static partial class Module
     [Reducer]
     public static void SetName(ReducerContext ctx, string name)
     {
-        if (string.IsNullOrWhiteSpace(name) || name.Length > 32)
-            throw new Exception("Name must be 1–32 characters.");
+        if (string.IsNullOrWhiteSpace(name) || name.Length > GameConstants.MaxNameLength)
+            throw new Exception($"Name must be 1–{GameConstants.MaxNameLength} characters.");
 
         var existing = ctx.Db.Player.Identity.Find(ctx.Sender);
         if (existing is not null)
@@ -51,7 +51,7 @@ public static partial class Module
         float dx = posX - player.PosX;
         float dy = posY - player.PosY;
         float dz = posZ - player.PosZ;
-        if (dx * dx + dy * dy + dz * dz > 400f)
+        if (dx * dx + dy * dy + dz * dz > GameConstants.MaxMovePerTickSq)
         {
             Log.Warn($"Player {player.Name} tried to teleport — rejected.");
             return;
@@ -71,7 +71,7 @@ public static partial class Module
     [Reducer]
     public static void SendChat(ReducerContext ctx, string text)
     {
-        if (string.IsNullOrWhiteSpace(text) || text.Length > 256) return;
+        if (string.IsNullOrWhiteSpace(text) || text.Length > GameConstants.MaxChatLength) return;
 
         var player = ctx.Db.Player.Identity.Find(ctx.Sender);
         string senderName = player?.Name ?? "Unknown";
@@ -81,7 +81,7 @@ public static partial class Module
             SenderId = ctx.Sender,
             SenderName = senderName,
             Text = text,
-            Timestamp = (ulong)((DateTimeOffset)ctx.Timestamp).ToUnixTimeMilliseconds() * 1000,
+            Timestamp = NowUs(ctx),
         });
     }
 }

@@ -32,7 +32,7 @@ public static partial class Module
             SourceId = 0, SourceType = "player",
             TargetId = id, TargetType = "world_object",
             Amount = (int)damage, DamageType = "harvest",
-            Timestamp = (ulong)((DateTimeOffset)ctx.Timestamp).ToUnixTimeMilliseconds(),
+            Timestamp = NowMs(ctx),
         });
 
         ctx.Db.WorldObject.Delete(o);

@@ -173,6 +173,13 @@ public partial class GameManager : Node
 			if (ac.EntityId == entityId && ac.EntityTable == entityTable) return ac;
 		return null;
 	}
+	public bool IsServiceIdentity(Identity identity)
+	{
+		if (Conn == null) return false;
+		foreach (var si in Conn.Db.ServiceIdentity.Iter())
+			if (si.ServiceId == identity) return true;
+		return false;
+	}
 	public IEnumerable<Npc> GetAllNpcs() { if (Conn != null) foreach (var n in Conn.Db.Npc.Iter()) yield return n; }
 	public Npc? GetNpc(ulong id) => Conn?.Db.Npc.Id.Find(id);
 	public IEnumerable<DamageEvent> GetRecentDamageEvents() { if (Conn != null) foreach (var e in Conn.Db.DamageEvent.Iter()) yield return e; }

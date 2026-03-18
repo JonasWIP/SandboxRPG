@@ -16,11 +16,8 @@ public static partial class Module
         if (existing is not null)
             throw new Exception("Furnace is already smelting.");
 
-        // Find input slot content (slot 0)
-        ContainerSlot? inputSlot = null;
-        foreach (var cs in ctx.Db.ContainerSlot.Iter())
-            if (cs.ContainerId == structureId && cs.ContainerTable == EntityTables.PlacedStructure && cs.Slot == 0)
-            { inputSlot = cs; break; }
+        // Find input slot content
+        var inputSlot = FindContainerSlot(ctx, structureId, EntityTables.PlacedStructure, GameConstants.FurnaceInputSlot);
 
         if (inputSlot is null || string.IsNullOrEmpty(inputSlot.Value.ItemType))
             throw new Exception("Furnace input is empty.");
@@ -31,7 +28,7 @@ public static partial class Module
             throw new Exception($"Cannot smelt {input.ItemType}.");
 
         var r = recipe.Value;
-        var now = (ulong)((DateTimeOffset)ctx.Timestamp).ToUnixTimeMilliseconds();
+        var now = NowMs(ctx);
 
         ctx.Db.FurnaceState.Insert(new FurnaceState
         {
@@ -64,7 +61,7 @@ public static partial class Module
         if (state is null) throw new Exception("Furnace is not smelting.");
 
         var fs = state.Value;
-        var now = (ulong)((DateTimeOffset)ctx.Timestamp).ToUnixTimeMilliseconds();
+        var now = NowMs(ctx);
 
         if (now < fs.StartTimeMs + fs.DurationMs)
             throw new Exception("Smelting not complete yet.");
@@ -74,11 +71,8 @@ public static partial class Module
 
         var r = recipe.Value;
 
-        // Place result in output slot (slot 1) or add to it
-        ContainerSlot? outputSlot = null;
-        foreach (var cs in ctx.Db.ContainerSlot.Iter())
-            if (cs.ContainerId == structureId && cs.ContainerTable == EntityTables.PlacedStructure && cs.Slot == 1)
-            { outputSlot = cs; break; }
+        // Place result in output slot or add to it
+        var outputSlot = FindContainerSlot(ctx, structureId, EntityTables.PlacedStructure, GameConstants.FurnaceOutputSlot);
 
         if (outputSlot is not null)
         {
@@ -95,7 +89,7 @@ public static partial class Module
             {
                 ContainerId = structureId,
                 ContainerTable = EntityTables.PlacedStructure,
-                Slot = 1,
+                Slot = GameConstants.FurnaceOutputSlot,
                 ItemType = r.OutputItem,
                 Quantity = r.OutputQuantity,
             });
@@ -117,10 +111,7 @@ public static partial class Module
         var fs = state.Value;
 
         // Return input item to input slot
-        ContainerSlot? inputSlot = null;
-        foreach (var cs in ctx.Db.ContainerSlot.Iter())
-            if (cs.ContainerId == structureId && cs.ContainerTable == EntityTables.PlacedStructure && cs.Slot == 0)
-            { inputSlot = cs; break; }
+        var inputSlot = FindContainerSlot(ctx, structureId, EntityTables.PlacedStructure, GameConstants.FurnaceInputSlot);
 
         if (inputSlot is not null)
         {
@@ -135,7 +126,7 @@ public static partial class Module
             {
                 ContainerId = structureId,
                 ContainerTable = EntityTables.PlacedStructure,
-                Slot = 0,
+                Slot = GameConstants.FurnaceInputSlot,
                 ItemType = fs.RecipeType,
                 Quantity = 1,
             });
@@ -156,7 +147,7 @@ public static partial class Module
         if (ac is not null && ac.Value.OwnerId != ctx.Sender)
             throw new Exception("Only the owner can edit the sign.");
 
-        if (text.Length > 200) text = text[..200];
+        if (text.Length > GameConstants.MaxSignTextLength) text = text[..GameConstants.MaxSignTextLength];
 
         var existing = ctx.Db.SignText.StructureId.Find(structureId);
         if (existing is not null)

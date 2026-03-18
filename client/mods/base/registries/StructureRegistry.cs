@@ -8,7 +8,13 @@ public static class StructureRegistry
 {
     private static readonly Dictionary<string, StructureDef> _defs = new();
 
-    public static void          Register(string type, StructureDef def) => _defs[type] = def;
+    public static void Register(string type, StructureDef def)
+    {
+        if (string.IsNullOrEmpty(type)) { GD.PrintErr("[StructureRegistry] Skipping registration: empty key"); return; }
+        if (def is null) { GD.PrintErr($"[StructureRegistry] Skipping registration: null def for '{type}'"); return; }
+        if (_defs.ContainsKey(type)) GD.Print($"[StructureRegistry] Overwriting existing entry: {type}");
+        _defs[type] = def;
+    }
     public static StructureDef? Get(string type) => _defs.TryGetValue(type, out var d) ? d : null;
 
     /// <summary>Returns all registered structure types where IsPlaceable = true.</summary>

@@ -8,7 +8,13 @@ public static class ItemRegistry
 {
     private static readonly Dictionary<string, ItemDef> _defs = new();
 
-    public static void     Register(string itemType, ItemDef def) => _defs[itemType] = def;
+    public static void Register(string itemType, ItemDef def)
+    {
+        if (string.IsNullOrEmpty(itemType)) { GD.PrintErr("[ItemRegistry] Skipping registration: empty key"); return; }
+        if (def is null) { GD.PrintErr($"[ItemRegistry] Skipping registration: null def for '{itemType}'"); return; }
+        if (_defs.ContainsKey(itemType)) GD.Print($"[ItemRegistry] Overwriting existing entry: {itemType}");
+        _defs[itemType] = def;
+    }
     public static ItemDef? Get(string itemType) => _defs.TryGetValue(itemType, out var d) ? d : null;
 
     /// <summary>

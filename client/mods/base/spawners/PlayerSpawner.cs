@@ -24,7 +24,7 @@ public class PlayerSpawner
 
         foreach (var player in _gm.GetAllPlayers())
         {
-            if (player.Identity != _gm.LocalIdentity && player.IsOnline)
+            if (player.Identity != _gm.LocalIdentity && player.IsOnline && !_gm.IsServiceIdentity(player.Identity))
                 SpawnOrUpdateRemotePlayer(player);
         }
     }
@@ -41,7 +41,7 @@ public class PlayerSpawner
                 return;
             }
 
-            if (player.IsOnline)
+            if (player.IsOnline && !_gm.IsServiceIdentity(player.Identity))
                 SpawnOrUpdateRemotePlayer(player);
             else
                 RemoveRemotePlayer(identityHex);

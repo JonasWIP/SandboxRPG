@@ -42,10 +42,7 @@ public static partial class Module
         if (toSlot < 0 || toSlot >= slotCount) throw new Exception("Invalid slot.");
 
         // Find existing container slot content
-        ContainerSlot? existing = null;
-        foreach (var cs in ctx.Db.ContainerSlot.Iter())
-            if (cs.ContainerId == containerId && cs.ContainerTable == containerTable && cs.Slot == toSlot)
-            { existing = cs; break; }
+        ContainerSlot? existing = FindContainerSlot(ctx, containerId, containerTable, toSlot);
 
         if (existing is not null)
         {
@@ -83,37 +80,13 @@ public static partial class Module
         if (!AccessControlHelper.CanAccess(ctx, containerId, containerTable))
             throw new Exception("Access denied.");
 
-        ContainerSlot? found = null;
-        foreach (var cs in ctx.Db.ContainerSlot.Iter())
-            if (cs.ContainerId == containerId && cs.ContainerTable == containerTable && cs.Slot == fromSlot)
-            { found = cs; break; }
-
+        var found = FindContainerSlot(ctx, containerId, containerTable, fromSlot);
         if (found is null) throw new Exception("Container slot is empty.");
         var slot = found.Value;
         if (quantity == 0 || quantity > slot.Quantity) throw new Exception("Invalid quantity.");
 
-        bool stacked = false;
-        foreach (var inv in ctx.Db.InventoryItem.Iter())
-        {
-            if (inv.OwnerId == ctx.Sender && inv.ItemType == slot.ItemType)
-            {
-                var updated = inv;
-                updated.Quantity += quantity;
-                ctx.Db.InventoryItem.Id.Update(updated);
-                stacked = true;
-                break;
-            }
-        }
-        if (!stacked)
-        {
-            ctx.Db.InventoryItem.Insert(new InventoryItem
-            {
-                OwnerId = ctx.Sender,
-                ItemType = slot.ItemType,
-                Quantity = quantity,
-                Slot = FindOpenHotbarSlot(ctx, ctx.Sender),
-            });
-        }
+        AddOrStackInventoryItem(ctx, ctx.Sender, slot.ItemType, quantity,
+            FindOpenHotbarSlot(ctx, ctx.Sender));
 
         if (quantity >= slot.Quantity)
             ctx.Db.ContainerSlot.Delete(slot);

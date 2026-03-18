@@ -22,10 +22,10 @@ public static partial class Module
         var cfg = FindNpcConfig(ctx, npc.NpcType);
         if (cfg is null || !cfg.Value.IsTrader) return;
 
-        // Range check (10.0 units — lenient since trade panel is already open)
+        // Range check
         float dx = p.PosX - npc.PosX;
         float dz = p.PosZ - npc.PosZ;
-        if (dx * dx + dz * dz > 10.0f * 10.0f) return;
+        if (dx * dx + dz * dz > GameConstants.TradeRangeSq) return;
 
         // Find trade offer
         NpcTradeOffer? offer = null;
@@ -39,54 +39,17 @@ public static partial class Module
         int totalCost = offer.Value.Price * (int)quantity;
         string currency = offer.Value.Currency;
 
-        // Check player has enough currency
-        uint currencyHeld = 0;
-        foreach (var item in ctx.Db.InventoryItem.Iter())
-            if (item.OwnerId == ctx.Sender && item.ItemType == currency)
-                currencyHeld += item.Quantity;
-
+        // Check and deduct currency
+        uint currencyHeld = CountInventoryItem(ctx, ctx.Sender, currency);
         if (currencyHeld < (uint)totalCost)
         {
             Log.Warn($"[TradeReducers] Player lacks {currency}: has {currencyHeld}, needs {totalCost}");
             return;
         }
-
-        // Deduct currency (consume from first matching stacks)
-        int remaining = totalCost;
-        var toDelete = new System.Collections.Generic.List<InventoryItem>();
-        var toUpdate = new System.Collections.Generic.List<(InventoryItem old, uint newQty)>();
-        foreach (var item in ctx.Db.InventoryItem.Iter())
-        {
-            if (remaining <= 0) break;
-            if (item.OwnerId != ctx.Sender || item.ItemType != currency) continue;
-
-            if (item.Quantity <= (uint)remaining)
-            {
-                remaining -= (int)item.Quantity;
-                toDelete.Add(item);
-            }
-            else
-            {
-                toUpdate.Add((item, item.Quantity - (uint)remaining));
-                remaining = 0;
-            }
-        }
-        foreach (var item in toDelete) ctx.Db.InventoryItem.Delete(item);
-        foreach (var (old, newQty) in toUpdate)
-        {
-            var updated = old;
-            updated.Quantity = newQty;
-            ctx.Db.InventoryItem.Id.Update(updated);
-        }
+        ConsumeFromInventory(ctx, ctx.Sender, currency, (uint)totalCost);
 
         // Give purchased item
-        ctx.Db.InventoryItem.Insert(new InventoryItem
-        {
-            OwnerId = ctx.Sender,
-            ItemType = buyItemType,
-            Quantity = quantity,
-            Slot = -1,
-        });
+        AddOrStackInventoryItem(ctx, ctx.Sender, buyItemType, quantity);
 
         Log.Info($"[TradeReducers] Player bought {quantity}x {buyItemType} for {totalCost} {currency}");
     }
@@ -113,7 +76,7 @@ public static partial class Module
         float dx = p.PosX - npc.PosX;
         float dz = p.PosZ - npc.PosZ;
         float distSq = dx * dx + dz * dz;
-        if (distSq > 10.0f * 10.0f) { Log.Warn($"[NpcSellItem] Out of range: {distSq}"); return; }
+        if (distSq > GameConstants.TradeRangeSq) { Log.Warn($"[NpcSellItem] Out of range: {distSq}"); return; }
 
         // Find the inventory item
         var itemRow = ctx.Db.InventoryItem.Id.Find(inventoryItemId);
@@ -122,12 +85,12 @@ public static partial class Module
         if (item.OwnerId != ctx.Sender) { Log.Warn("[NpcSellItem] Not item owner"); return; }
         if (quantity > item.Quantity || quantity == 0) { Log.Warn($"[NpcSellItem] Bad qty: {quantity} vs {item.Quantity}"); return; }
 
-        // Calculate sell price (half of buy price if the item is in trade offers, otherwise 1 coin per item)
-        int pricePerUnit = 1;
+        // Calculate sell price (half of buy price if listed, otherwise minimum)
+        int pricePerUnit = GameConstants.MinSellPrice;
         foreach (var offer in ctx.Db.NpcTradeOffer.Iter())
         {
             if (offer.NpcType == npc.NpcType && offer.ItemType == item.ItemType)
-            { pricePerUnit = System.Math.Max(1, offer.Price / 2); break; }
+            { pricePerUnit = System.Math.Max(GameConstants.MinSellPrice, (int)(offer.Price * GameConstants.SellPriceMultiplier)); break; }
         }
 
         int totalEarned = pricePerUnit * (int)quantity;
@@ -144,29 +107,8 @@ public static partial class Module
             ctx.Db.InventoryItem.Id.Update(updated);
         }
 
-        // Give currency — try to stack onto existing coins
-        bool stacked = false;
-        foreach (var inv in ctx.Db.InventoryItem.Iter())
-        {
-            if (inv.OwnerId == ctx.Sender && inv.ItemType == "copper_coin")
-            {
-                var updated = inv;
-                updated.Quantity += (uint)totalEarned;
-                ctx.Db.InventoryItem.Id.Update(updated);
-                stacked = true;
-                break;
-            }
-        }
-        if (!stacked)
-        {
-            ctx.Db.InventoryItem.Insert(new InventoryItem
-            {
-                OwnerId = ctx.Sender,
-                ItemType = "copper_coin",
-                Quantity = (uint)totalEarned,
-                Slot = -1,
-            });
-        }
+        // Give currency
+        AddOrStackInventoryItem(ctx, ctx.Sender, "copper_coin", (uint)totalEarned);
 
         Log.Info($"[TradeReducers] Player sold {quantity}x {item.ItemType} for {totalEarned} copper_coin");
     }

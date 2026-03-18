@@ -38,51 +38,11 @@ public static partial class Module
 
         // Consume ingredients
         foreach (var (itemType, needed) in ingredients)
-        {
-            uint remaining = needed;
-            foreach (var inv in ctx.Db.InventoryItem.Iter())
-            {
-                if (remaining == 0) break;
-                if (inv.OwnerId != identity || inv.ItemType != itemType) continue;
+            ConsumeFromInventory(ctx, identity, itemType, needed);
 
-                if (inv.Quantity <= remaining)
-                {
-                    remaining -= inv.Quantity;
-                    ctx.Db.InventoryItem.Delete(inv);
-                }
-                else
-                {
-                    var updated = inv;
-                    updated.Quantity -= remaining;
-                    ctx.Db.InventoryItem.Id.Update(updated);
-                    remaining = 0;
-                }
-            }
-        }
-
-        // Award crafted item — stack with existing slot if possible
-        bool stacked = false;
-        foreach (var invItem in ctx.Db.InventoryItem.Iter())
-        {
-            if (invItem.OwnerId == identity && invItem.ItemType == r.ResultItemType)
-            {
-                var updated = invItem;
-                updated.Quantity += r.ResultQuantity;
-                ctx.Db.InventoryItem.Id.Update(updated);
-                stacked = true;
-                break;
-            }
-        }
-        if (!stacked)
-        {
-            ctx.Db.InventoryItem.Insert(new InventoryItem
-            {
-                OwnerId  = identity,
-                ItemType = r.ResultItemType,
-                Quantity = r.ResultQuantity,
-                Slot     = FindOpenHotbarSlot(ctx, identity),
-            });
-        }
+        // Award crafted item
+        AddOrStackInventoryItem(ctx, identity, r.ResultItemType, r.ResultQuantity,
+            FindOpenHotbarSlot(ctx, identity));
 
         Log.Info($"Player crafted {r.ResultQuantity}x {r.ResultItemType}");
     }

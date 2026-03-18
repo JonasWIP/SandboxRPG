@@ -102,6 +102,12 @@ public partial class SettingsUI : BasePanel
             _statusLabel.AddThemeColorOverride("font_color", UIFactory.ColourDanger);
             return;
         }
+        if (name.Length > 32)
+        {
+            _statusLabel.Text = "Name must be at most 32 characters.";
+            _statusLabel.AddThemeColorOverride("font_color", UIFactory.ColourDanger);
+            return;
+        }
 
         string colorHex = "#" + _colorBtn.Color.ToHtml(false);
         PlayerPrefs.SaveAll(name, colorHex);

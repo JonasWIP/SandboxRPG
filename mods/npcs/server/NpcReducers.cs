@@ -22,8 +22,7 @@ public static partial class Module
         return null;
     }
 
-    private static ulong NowMs(ReducerContext ctx) =>
-        (ulong)((DateTimeOffset)ctx.Timestamp).ToUnixTimeMilliseconds();
+    // NowMs is defined in server/Helpers.cs (shared across all partial class Module files)
 
     // ---- service identity ----
 
@@ -201,7 +200,7 @@ public static partial class Module
     public static void CleanupDamageEvents(ReducerContext ctx)
     {
         if (!IsService(ctx)) return;
-        ulong cutoff = NowMs(ctx) - 30_000; // 30 seconds ago
+        ulong cutoff = NowMs(ctx) - GameConstants.DamageEventTtlMs;
         var toDelete = new System.Collections.Generic.List<DamageEvent>();
         foreach (var e in ctx.Db.DamageEvent.Iter())
             if (e.Timestamp < cutoff) toDelete.Add(e);

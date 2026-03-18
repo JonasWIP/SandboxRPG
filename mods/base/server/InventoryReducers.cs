@@ -20,36 +20,15 @@ public static partial class Module
         var player = ctx.Db.Player.Identity.Find(ctx.Sender);
         if (player is null) return;
 
-        // Distance check — 5 unit pickup radius
+        // Distance check
         float dx = item.PosX - player.Value.PosX;
         float dz = item.PosZ - player.Value.PosZ;
-        if (dx * dx + dz * dz > 25f)
+        if (dx * dx + dz * dz > GameConstants.PickupRangeSq)
             throw new Exception("Too far away to pick up.");
 
-        // Stack with existing inventory slot if possible
-        bool stacked = false;
-        foreach (var invItem in ctx.Db.InventoryItem.Iter())
-        {
-            if (invItem.OwnerId == ctx.Sender && invItem.ItemType == item.ItemType)
-            {
-                var updated = invItem;
-                updated.Quantity += item.Quantity;
-                ctx.Db.InventoryItem.Id.Update(updated);
-                stacked = true;
-                break;
-            }
-        }
-
-        if (!stacked)
-        {
-            ctx.Db.InventoryItem.Insert(new InventoryItem
-            {
-                OwnerId  = ctx.Sender,
-                ItemType = item.ItemType,
-                Quantity = item.Quantity,
-                Slot     = FindOpenHotbarSlot(ctx, ctx.Sender),
-            });
-        }
+        // Stack with existing or create new
+        AddOrStackInventoryItem(ctx, ctx.Sender, item.ItemType, item.Quantity,
+            FindOpenHotbarSlot(ctx, ctx.Sender));
 
         ctx.Db.WorldItem.Delete(item);
     }
@@ -89,7 +68,7 @@ public static partial class Module
     [Reducer]
     public static void MoveItemToSlot(ReducerContext ctx, ulong inventoryItemId, int slot)
     {
-        if (slot < -1 || slot >= 8) return;
+        if (slot < GameConstants.BagSlot || slot >= GameConstants.HotbarSize) return;
 
         var invItem = ctx.Db.InventoryItem.Id.Find(inventoryItemId);
         if (invItem is null) return;
@@ -120,16 +99,16 @@ public static partial class Module
     // SHARED HELPERS
     // =========================================================================
 
-    /// <summary>Returns the first hotbar slot (0–7) not occupied by this player, or -1 if all full.</summary>
+    /// <summary>Returns the first hotbar slot (0–7) not occupied by this player, or BagSlot if all full.</summary>
     internal static int FindOpenHotbarSlot(ReducerContext ctx, SpacetimeDB.Identity owner)
     {
-        var used = new bool[8];
+        var used = new bool[GameConstants.HotbarSize];
         foreach (var inv in ctx.Db.InventoryItem.Iter())
-            if (inv.OwnerId == owner && inv.Slot >= 0 && inv.Slot < 8)
+            if (inv.OwnerId == owner && inv.Slot >= 0 && inv.Slot < GameConstants.HotbarSize)
                 used[inv.Slot] = true;
-        for (int i = 0; i < 8; i++)
+        for (int i = 0; i < GameConstants.HotbarSize; i++)
             if (!used[i]) return i;
-        return -1;
+        return GameConstants.BagSlot;
     }
 
     /// <summary>Parses "wood:4,stone:2" ingredient strings into typed tuples.</summary>
