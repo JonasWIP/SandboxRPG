@@ -48,10 +48,16 @@ public class WorldItemSpawner
             ItemType = item.ItemType,
             Quantity = item.Quantity,
         };
-        var visual = ContentSpawner.SpawnVisual(ItemRegistry.Get(item.ItemType), item.ItemType);
-        visual.Position = new Vector3(0, 0.1f, 0); // lift slightly off ground (matches original)
+        var def = ItemRegistry.Get(item.ItemType);
+        var visual = ContentSpawner.SpawnVisual(def, item.ItemType);
+        float itemScale = def?.Scale ?? 0.4f;
+        visual.Position = new Vector3(0, 0.1f, 0);
         body.AddChild(visual);
-        body.AddChild(new CollisionShape3D { Shape = new SphereShape3D { Radius = 0.2f } });
+        body.AddChild(new CollisionShape3D
+        {
+            Shape = new SphereShape3D { Radius = Mathf.Max(0.3f, itemScale) },
+            Position = new Vector3(0, 0.1f + itemScale * 0.5f, 0),
+        });
         body.AddChild(new Label3D
         {
             Text = $"{item.ItemType} x{item.Quantity}", FontSize = 32,

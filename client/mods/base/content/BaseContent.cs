@@ -22,14 +22,14 @@ public static class BaseContent
     {
         ItemRegistry.Register("wood",          new ItemDef { ModelPath = "res://assets/models/survival/resource-wood.glb",  DisplayName = "Wood",          MaxStack = 50 });
         ItemRegistry.Register("stone",         new ItemDef { ModelPath = "res://assets/models/survival/resource-stone.glb", DisplayName = "Stone",         MaxStack = 50 });
-        ItemRegistry.Register("iron",          new ItemDef { DisplayName = "Iron",          TintColor = new Color(0.7f, 0.7f, 0.75f), MaxStack = 50 });
-        ItemRegistry.Register("wood_pickaxe",  new ItemDef { DisplayName = "Wood Pickaxe",  MaxStack = 1 });
-        ItemRegistry.Register("wood_axe",      new ItemDef { DisplayName = "Wood Axe",      MaxStack = 1 });
-        ItemRegistry.Register("stone_pickaxe", new ItemDef { DisplayName = "Stone Pickaxe", MaxStack = 1 });
-        ItemRegistry.Register("iron_pickaxe",  new ItemDef { DisplayName = "Iron Pickaxe",  MaxStack = 1 });
-        ItemRegistry.Register("furnace",        new ItemDef { DisplayName = "Furnace",        MaxStack = 1 });
-        ItemRegistry.Register("crafting_table", new ItemDef { DisplayName = "Crafting Table", MaxStack = 1 });
-        ItemRegistry.Register("sign",           new ItemDef { DisplayName = "Sign",           MaxStack = 10 });
+        ItemRegistry.Register("iron",          new ItemDef { DisplayName = "Iron",          TintColor = new Color(0.7f, 0.7f, 0.75f), MaxStack = 50, Scale = 0.25f });
+        ItemRegistry.Register("wood_pickaxe",  new ItemDef { DisplayName = "Wood Pickaxe",  MaxStack = 1, Scale = 0.3f });
+        ItemRegistry.Register("wood_axe",      new ItemDef { DisplayName = "Wood Axe",      MaxStack = 1, Scale = 0.3f });
+        ItemRegistry.Register("stone_pickaxe", new ItemDef { DisplayName = "Stone Pickaxe", MaxStack = 1, Scale = 0.3f });
+        ItemRegistry.Register("iron_pickaxe",  new ItemDef { DisplayName = "Iron Pickaxe",  MaxStack = 1, Scale = 0.3f });
+        ItemRegistry.Register("furnace",        new ItemDef { DisplayName = "Furnace",        MaxStack = 1, Scale = 0.4f });
+        ItemRegistry.Register("crafting_table", new ItemDef { DisplayName = "Crafting Table", MaxStack = 1, Scale = 0.4f });
+        ItemRegistry.Register("sign",           new ItemDef { DisplayName = "Sign",           MaxStack = 10, Scale = 0.3f });
     }
 
     private static void RegisterStructures()
