@@ -13,6 +13,7 @@ public partial class WorldManager : Node3D
     private WorldItemSpawner _items = null!;
     private StructureSpawner _structures = null!;
     private WorldObjectSpawner _worldObjects = null!;
+    private NpcSpawner _npcs = null!;
 
     public override void _Ready()
     {
@@ -21,6 +22,7 @@ public partial class WorldManager : Node3D
         _items        = new WorldItemSpawner(this, gm);
         _structures   = new StructureSpawner(this, gm);
         _worldObjects = new WorldObjectSpawner(this, gm);
+        _npcs         = new NpcSpawner(this, gm);
 
         gm.SubscriptionApplied += OnSubscriptionApplied;
         gm.PlayerUpdated       += id => _players.OnUpdated(id);
@@ -28,6 +30,7 @@ public partial class WorldManager : Node3D
         gm.WorldItemChanged    += _items.Sync;
         gm.StructureChanged    += _structures.Sync;
         gm.WorldObjectUpdated  += _worldObjects.OnUpdated;
+        gm.NpcUpdated          += _npcs.OnUpdated;
 
         if (gm.IsConnected && gm.GetLocalPlayer() != null)
             OnSubscriptionApplied();
@@ -44,5 +47,6 @@ public partial class WorldManager : Node3D
         _items.Sync();
         _structures.Sync();
         _worldObjects.SyncAll();
+        _npcs.SpawnAll();
     }
 }
