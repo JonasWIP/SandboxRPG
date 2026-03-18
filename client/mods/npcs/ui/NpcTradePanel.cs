@@ -9,7 +9,8 @@ public partial class NpcTradePanel : BasePanel
 {
     private readonly ulong _npcId;
     private readonly string _npcType;
-    private VBoxContainer _offerList = null!;
+    private VBoxContainer _buyList = null!;
+    private VBoxContainer _sellList = null!;
     private Label _currencyLabel = null!;
 
     public NpcTradePanel(ulong npcId, string npcType)
@@ -21,12 +22,12 @@ public partial class NpcTradePanel : BasePanel
     public override void OnPushed()
     {
         base.OnPushed();
-        GameManager.Instance.InventoryChanged += RefreshCurrency;
+        GameManager.Instance.InventoryChanged += RefreshAll;
     }
 
     public override void OnPopped()
     {
-        GameManager.Instance.InventoryChanged -= RefreshCurrency;
+        GameManager.Instance.InventoryChanged -= RefreshAll;
         base.OnPopped();
     }
 
@@ -43,7 +44,7 @@ public partial class NpcTradePanel : BasePanel
         center.SetAnchorsPreset(LayoutPreset.FullRect);
         AddChild(center);
 
-        var panel = UIFactory.MakePanel(new Vector2(500, 400));
+        var panel = UIFactory.MakePanel(new Vector2(700, 500));
         center.AddChild(panel);
 
         var vbox = UIFactory.MakeVBox(10);
@@ -59,41 +60,97 @@ public partial class NpcTradePanel : BasePanel
 
         vbox.AddChild(UIFactory.MakeSeparator());
 
-        // Currency display
         _currencyLabel = UIFactory.MakeLabel("", 14, UIFactory.ColourMuted);
         vbox.AddChild(_currencyLabel);
-        RefreshCurrency();
 
-        // Offers scroll
-        var scroll = new ScrollContainer { SizeFlagsVertical = SizeFlags.ExpandFill };
-        vbox.AddChild(scroll);
+        // Two columns: Buy (left) and Sell (right)
+        var columns = UIFactory.MakeHBox(16);
+        columns.SizeFlagsVertical = SizeFlags.ExpandFill;
+        vbox.AddChild(columns);
 
-        _offerList = UIFactory.MakeVBox(6);
-        scroll.AddChild(_offerList);
+        // Buy column
+        var buyCol = UIFactory.MakeVBox(6);
+        buyCol.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        columns.AddChild(buyCol);
+        buyCol.AddChild(UIFactory.MakeLabel("Buy", 16, UIFactory.ColourAccent));
+        var buyScroll = new ScrollContainer { SizeFlagsVertical = SizeFlags.ExpandFill };
+        buyCol.AddChild(buyScroll);
+        _buyList = UIFactory.MakeVBox(4);
+        buyScroll.AddChild(_buyList);
 
-        PopulateOffers();
+        // Sell column
+        var sellCol = UIFactory.MakeVBox(6);
+        sellCol.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        columns.AddChild(sellCol);
+        sellCol.AddChild(UIFactory.MakeLabel("Sell", 16, UIFactory.ColourAccent));
+        var sellScroll = new ScrollContainer { SizeFlagsVertical = SizeFlags.ExpandFill };
+        sellCol.AddChild(sellScroll);
+        _sellList = UIFactory.MakeVBox(4);
+        sellScroll.AddChild(_sellList);
+
+        RefreshAll();
     }
 
-    private void PopulateOffers()
+    private void RefreshAll()
     {
-        foreach (var child in _offerList.GetChildren())
+        RefreshCurrency();
+        PopulateBuyOffers();
+        PopulateSellItems();
+    }
+
+    private void PopulateBuyOffers()
+    {
+        foreach (var child in _buyList.GetChildren())
             child.QueueFree();
 
         foreach (var offer in GameManager.Instance.GetTradeOffers(_npcType))
         {
-            var row = UIFactory.MakeHBox(10);
-            _offerList.AddChild(row);
+            var row = UIFactory.MakeHBox(8);
+            _buyList.AddChild(row);
 
             var itemDef = ItemRegistry.Get(offer.ItemType);
             string displayName = itemDef?.DisplayName ?? offer.ItemType.Replace('_', ' ');
 
-            row.AddChild(UIFactory.MakeLabel(displayName, 14));
-            row.AddChild(UIFactory.MakeLabel($"{offer.Price} {offer.Currency.Replace('_', ' ')}", 14, UIFactory.ColourMuted));
+            row.AddChild(UIFactory.MakeLabel(displayName, 13));
+            row.AddChild(UIFactory.MakeLabel($"{offer.Price}c", 13, UIFactory.ColourMuted));
 
-            var buyBtn = UIFactory.MakeButton("Buy", 12, new Vector2(60, 28));
+            var buyBtn = UIFactory.MakeButton("Buy", 11, new Vector2(50, 24));
             string itemType = offer.ItemType;
             buyBtn.Pressed += () => GameManager.Instance.TradeWithNpc(_npcId, itemType, 1);
             row.AddChild(buyBtn);
+        }
+    }
+
+    private void PopulateSellItems()
+    {
+        foreach (var child in _sellList.GetChildren())
+            child.QueueFree();
+
+        foreach (var item in GameManager.Instance.GetMyInventory())
+        {
+            if (item.ItemType == "copper_coin") continue; // don't sell currency
+
+            var itemDef = ItemRegistry.Get(item.ItemType);
+            string displayName = itemDef?.DisplayName ?? item.ItemType.Replace('_', ' ');
+
+            // Calculate sell price: half of buy price if in trade offers, else 1
+            int sellPrice = 1;
+            foreach (var offer in GameManager.Instance.GetTradeOffers(_npcType))
+            {
+                if (offer.ItemType == item.ItemType)
+                { sellPrice = System.Math.Max(1, offer.Price / 2); break; }
+            }
+
+            var row = UIFactory.MakeHBox(8);
+            _sellList.AddChild(row);
+
+            row.AddChild(UIFactory.MakeLabel($"{displayName} x{item.Quantity}", 13));
+            row.AddChild(UIFactory.MakeLabel($"{sellPrice}c", 13, UIFactory.ColourMuted));
+
+            var sellBtn = UIFactory.MakeButton("Sell", 11, new Vector2(50, 24));
+            ulong itemId = item.Id;
+            sellBtn.Pressed += () => GameManager.Instance.SellItemToNpc(_npcId, itemId, 1);
+            row.AddChild(sellBtn);
         }
     }
 

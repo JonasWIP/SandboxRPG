@@ -127,6 +127,7 @@ public partial class GameManager : Node
 		=> Conn?.Reducers.ContainerTransfer(containerId, containerTable, fromSlot, toSlot);
 	public void AttackNpc(ulong npcId) => Conn?.Reducers.PlayerAttackNpc(npcId);
 	public void TradeWithNpc(ulong npcId, string itemType, uint qty) => Conn?.Reducers.NpcTrade(npcId, itemType, qty);
+	public void SellItemToNpc(ulong npcId, ulong inventoryItemId, uint qty) => Conn?.Reducers.NpcSellItem(npcId, inventoryItemId, qty);
 
 	// =========================================================================
 	// DATA ACCESS — READ FROM STDB CLIENT CACHE

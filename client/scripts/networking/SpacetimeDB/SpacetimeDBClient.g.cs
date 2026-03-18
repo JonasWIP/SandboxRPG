@@ -687,6 +687,7 @@ namespace SpacetimeDB.Types
                 Reducer.NpcDealDamageToPlayer args => Reducers.InvokeNpcDealDamageToPlayer(eventContext, args),
                 Reducer.NpcMove args => Reducers.InvokeNpcMove(eventContext, args),
                 Reducer.NpcRespawn args => Reducers.InvokeNpcRespawn(eventContext, args),
+                Reducer.NpcSellItem args => Reducers.InvokeNpcSellItem(eventContext, args),
                 Reducer.NpcSetState args => Reducers.InvokeNpcSetState(eventContext, args),
                 Reducer.NpcTrade args => Reducers.InvokeNpcTrade(eventContext, args),
                 Reducer.PickupItem args => Reducers.InvokePickupItem(eventContext, args),
