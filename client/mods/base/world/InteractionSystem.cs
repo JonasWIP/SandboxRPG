@@ -30,6 +30,10 @@ public partial class InteractionSystem : Node
         _camera ??= GetViewport()?.GetCamera3D();
         if (_camera == null) return;
 
+        // Don't process interactions while UI is open
+        if (UIManager.Instance.IsAnyOpen)
+        { HideHint(); return; }
+
         var spaceState = _camera.GetWorld3D()?.DirectSpaceState;
         if (spaceState == null) return;
 
@@ -73,8 +77,10 @@ public partial class InteractionSystem : Node
             if (Input.IsActionJustPressed("primary_attack"))
                 attackable.Attack(player);
         }
-        else if (interactable != null)
+        else if (interactable != null && attackable == null)
         {
+            // Only show "[Private]" for pure interactables (e.g. locked chests),
+            // not for attackable-only entities like wolves
             ShowHint("[Private]");
         }
         else

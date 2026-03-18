@@ -193,7 +193,9 @@ public partial class NpcEntity : StaticBody3D, IInteractable, IAttackable
 
     public void UpdateFromServer(Npc npc)
     {
-        _targetPosition = new Vector3(npc.PosX, npc.PosY, npc.PosZ);
+        // Server sends Y=0 for ground-level NPCs; use terrain height instead
+        float y = npc.PosY > 0.01f ? npc.PosY : Terrain.HeightAt(npc.PosX, npc.PosZ);
+        _targetPosition = new Vector3(npc.PosX, y, npc.PosZ);
         _targetRotY = npc.RotY;
         NpcHealth = npc.Health;
         NpcMaxHealth = npc.MaxHealth;

@@ -32,10 +32,12 @@ public partial class WorldManager : Node3D
         gm.WorldObjectUpdated  += _worldObjects.OnUpdated;
         gm.NpcUpdated          += _npcs.OnUpdated;
 
+        // Initialize mods BEFORE checking subscription — registries must be
+        // populated before any spawner creates visuals.
+        ModManager.Instance.InitializeAll(this);
+
         if (gm.IsConnected && gm.GetLocalPlayer() != null)
             OnSubscriptionApplied();
-
-        ModManager.Instance.InitializeAll(this);
     }
 
     private void OnSubscriptionApplied()
