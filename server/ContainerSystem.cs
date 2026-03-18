@@ -166,16 +166,3 @@ public static partial class Module
         }
     }
 }
-
-public static class ContainerConfig
-{
-    private static readonly Dictionary<string, int> _slotCounts = new();
-
-    public static void Register(string structureType, int slotCount)
-        => _slotCounts[structureType] = slotCount;
-
-    public static int GetSlotCount(string structureType)
-        => _slotCounts.TryGetValue(structureType, out var n) ? n : 0;
-
-    public static void Clear() => _slotCounts.Clear();
-}
