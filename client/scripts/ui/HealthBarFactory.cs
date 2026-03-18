@@ -23,7 +23,7 @@ public static class HealthBarFactory
         {
             Size = new Vector2I(width, height),
             TransparentBg = true,
-            RenderTargetUpdateMode = SubViewport.UpdateMode.WhenVisible,
+            RenderTargetUpdateMode = SubViewport.UpdateMode.Always,
         };
 
         var bar = new ProgressBar
