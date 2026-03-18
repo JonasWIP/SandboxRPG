@@ -26,6 +26,7 @@ public static partial class Module
                 ResultQuantity   = HelloWorldConstants.Quantity,
                 Ingredients      = HelloWorldConstants.Ingredients,
                 CraftTimeSeconds = HelloWorldConstants.CraftTimeSeconds,
+                Station          = "",
             });
             Log.Info("[HelloWorldMod] Seeded.");
         }

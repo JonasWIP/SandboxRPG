@@ -27,15 +27,15 @@ public static partial class Module
 
     internal static void SeedRecipes(ReducerContext ctx)
     {
-        ctx.Db.CraftingRecipe.Insert(new CraftingRecipe { ResultItemType = "wood_wall",      ResultQuantity = 1, Ingredients = "wood:4",        CraftTimeSeconds = 2f });
-        ctx.Db.CraftingRecipe.Insert(new CraftingRecipe { ResultItemType = "stone_wall",     ResultQuantity = 1, Ingredients = "stone:6",       CraftTimeSeconds = 3f });
-        ctx.Db.CraftingRecipe.Insert(new CraftingRecipe { ResultItemType = "wood_floor",     ResultQuantity = 1, Ingredients = "wood:3",        CraftTimeSeconds = 1.5f });
-        ctx.Db.CraftingRecipe.Insert(new CraftingRecipe { ResultItemType = "wood_door",      ResultQuantity = 1, Ingredients = "wood:3,iron:1", CraftTimeSeconds = 2f });
-        ctx.Db.CraftingRecipe.Insert(new CraftingRecipe { ResultItemType = "campfire",       ResultQuantity = 1, Ingredients = "wood:5,stone:3", CraftTimeSeconds = 3f });
-        ctx.Db.CraftingRecipe.Insert(new CraftingRecipe { ResultItemType = "workbench",      ResultQuantity = 1, Ingredients = "wood:8,stone:4", CraftTimeSeconds = 5f });
-        ctx.Db.CraftingRecipe.Insert(new CraftingRecipe { ResultItemType = "chest",          ResultQuantity = 1, Ingredients = "wood:6,iron:2",  CraftTimeSeconds = 4f });
-        ctx.Db.CraftingRecipe.Insert(new CraftingRecipe { ResultItemType = "stone_pickaxe",  ResultQuantity = 1, Ingredients = "wood:2,stone:3", CraftTimeSeconds = 2f });
-        ctx.Db.CraftingRecipe.Insert(new CraftingRecipe { ResultItemType = "iron_pickaxe",   ResultQuantity = 1, Ingredients = "wood:2,iron:3",  CraftTimeSeconds = 3f });
+        ctx.Db.CraftingRecipe.Insert(new CraftingRecipe { ResultItemType = "wood_wall",      ResultQuantity = 1, Ingredients = "wood:4",        CraftTimeSeconds = 2f,   Station = "" });
+        ctx.Db.CraftingRecipe.Insert(new CraftingRecipe { ResultItemType = "stone_wall",     ResultQuantity = 1, Ingredients = "stone:6",       CraftTimeSeconds = 3f,   Station = "" });
+        ctx.Db.CraftingRecipe.Insert(new CraftingRecipe { ResultItemType = "wood_floor",     ResultQuantity = 1, Ingredients = "wood:3",        CraftTimeSeconds = 1.5f, Station = "" });
+        ctx.Db.CraftingRecipe.Insert(new CraftingRecipe { ResultItemType = "wood_door",      ResultQuantity = 1, Ingredients = "wood:3,iron:1", CraftTimeSeconds = 2f,   Station = "" });
+        ctx.Db.CraftingRecipe.Insert(new CraftingRecipe { ResultItemType = "campfire",       ResultQuantity = 1, Ingredients = "wood:5,stone:3", CraftTimeSeconds = 3f,  Station = "" });
+        ctx.Db.CraftingRecipe.Insert(new CraftingRecipe { ResultItemType = "workbench",      ResultQuantity = 1, Ingredients = "wood:8,stone:4", CraftTimeSeconds = 5f,  Station = "" });
+        ctx.Db.CraftingRecipe.Insert(new CraftingRecipe { ResultItemType = "chest",          ResultQuantity = 1, Ingredients = "wood:6,iron:2",  CraftTimeSeconds = 4f,  Station = "" });
+        ctx.Db.CraftingRecipe.Insert(new CraftingRecipe { ResultItemType = "stone_pickaxe",  ResultQuantity = 1, Ingredients = "wood:2,stone:3", CraftTimeSeconds = 2f,  Station = "" });
+        ctx.Db.CraftingRecipe.Insert(new CraftingRecipe { ResultItemType = "iron_pickaxe",   ResultQuantity = 1, Ingredients = "wood:2,iron:3",  CraftTimeSeconds = 3f,  Station = "" });
 
         Log.Info("Seeded crafting recipes.");
     }
