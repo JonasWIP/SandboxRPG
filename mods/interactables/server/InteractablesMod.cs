@@ -147,7 +147,7 @@ public static partial class Module
         ctx.Db.CraftingRecipe.Insert(new CraftingRecipe
         {
             ResultItemType = "furnace", ResultQuantity = 1,
-            Ingredients = "stone:8,iron:2", CraftTimeSeconds = 5f, Station = "",
+            Ingredients = "stone:8,iron:2", CraftTimeSeconds = 5f, Station = "crafting_table",
         });
         ctx.Db.CraftingRecipe.Insert(new CraftingRecipe
         {

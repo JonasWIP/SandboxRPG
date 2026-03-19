@@ -142,10 +142,10 @@ public static partial class Module
         if (!AccessControlHelper.CanAccess(ctx, structureId, EntityTables.PlacedStructure))
             throw new Exception("Access denied.");
 
-        // Only owner can edit
+        // Public signs can be edited by anyone; private signs require ownership
         var ac = AccessControlHelper.Find(ctx, structureId, EntityTables.PlacedStructure);
-        if (ac is not null && ac.Value.OwnerId != ctx.Sender)
-            throw new Exception("Only the owner can edit the sign.");
+        if (ac is not null && !ac.Value.IsPublic && ac.Value.OwnerId != ctx.Sender)
+            throw new Exception("Only the owner can edit a private sign.");
 
         if (text.Length > GameConstants.MaxSignTextLength) text = text[..GameConstants.MaxSignTextLength];
 

@@ -39,12 +39,6 @@ public partial class SignPanel : BasePanel
 
         root.AddChild(UIFactory.MakeSeparator());
 
-        // Determine ownership
-        bool isOwner = false;
-        var ac = GameManager.Instance.GetAccessControl(_structureId, "placed_structure");
-        if (ac is not null && GameManager.Instance.LocalIdentity is not null)
-            isOwner = ac.OwnerId == GameManager.Instance.LocalIdentity.Value;
-
         // Get current text
         string currentText = "";
         if (GameManager.Instance.Conn != null)
@@ -53,31 +47,23 @@ public partial class SignPanel : BasePanel
             if (st is not null) currentText = st.Text;
         }
 
-        if (isOwner)
+        // Always allow editing — signs are public-write by design
+        // (server access control already validates)
+        var textEdit = new TextEdit
         {
-            var textEdit = new TextEdit
-            {
-                Text = currentText,
-                CustomMinimumSize = new Vector2(350, 150),
-            };
-            textEdit.AddThemeFontSizeOverride("font_size", 14);
-            root.AddChild(textEdit);
+            Text = currentText,
+            CustomMinimumSize = new Vector2(350, 150),
+            PlaceholderText = "Write something on the sign...",
+        };
+        textEdit.AddThemeFontSizeOverride("font_size", 14);
+        root.AddChild(textEdit);
 
-            var saveBtn = UIFactory.MakeButton("Save", 14, new Vector2(100, 34));
-            saveBtn.Pressed += () =>
-            {
-                GameManager.Instance.Conn?.Reducers.UpdateSignText(_structureId, textEdit.Text);
-                UIManager.Instance.Pop();
-            };
-            root.AddChild(saveBtn);
-        }
-        else
+        var saveBtn = UIFactory.MakeButton("Save", 14, new Vector2(100, 34));
+        saveBtn.Pressed += () =>
         {
-            var label = UIFactory.MakeLabel(
-                string.IsNullOrEmpty(currentText) ? "(empty)" : currentText, 14);
-            label.AutowrapMode = TextServer.AutowrapMode.WordSmart;
-            label.CustomMinimumSize = new Vector2(350, 150);
-            root.AddChild(label);
-        }
+            GameManager.Instance.Conn?.Reducers.UpdateSignText(_structureId, textEdit.Text);
+            UIManager.Instance.Pop();
+        };
+        root.AddChild(saveBtn);
     }
 }
