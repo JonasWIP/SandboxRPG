@@ -26,7 +26,9 @@ public static class InteractablesContent
         StructureRegistry.Register("furnace", new StructureDef
         {
             DisplayName = "Furnace",
+            ModelPath = "res://assets/models/survival/barrel.glb",
             TintColor = new Color(0.7f, 0.3f, 0.2f),
+            Scale = 1.2f,
             CollisionSize = new Vector3(1.0f, 1.0f, 1.0f),
             CollisionCenter = new Vector3(0, 0.5f, 0),
             YOffset = 0.5f,
@@ -43,7 +45,9 @@ public static class InteractablesContent
         StructureRegistry.Register("sign", new StructureDef
         {
             DisplayName = "Sign",
-            TintColor = new Color(0.8f, 0.7f, 0.5f),
+            ModelPath = "res://assets/models/survival/resource-planks.glb",
+            TintColor = new Color(0.85f, 0.75f, 0.55f),
+            Scale = 0.8f,
             CollisionSize = new Vector3(0.6f, 1.0f, 0.1f),
             CollisionCenter = new Vector3(0, 0.5f, 0),
             YOffset = 0.5f,

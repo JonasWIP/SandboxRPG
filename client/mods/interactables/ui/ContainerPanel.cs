@@ -24,6 +24,10 @@ public partial class ContainerPanel : InteractionPanel
     public override void OnPushed()
     {
         base.OnPushed();
+        // Enable deposit actions in inventory grid
+        _inventoryGrid.ActiveContainerId = _containerId;
+        _inventoryGrid.ActiveContainerTable = _containerTable;
+        _inventoryGrid.ActiveContainerSlotCount = _slotCount;
         GameManager.Instance.ContainerSlotChanged += RefreshAll;
     }
 

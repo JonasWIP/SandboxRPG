@@ -8,6 +8,11 @@ public partial class InventoryGrid : VBoxContainer
     private GridContainer _grid = null!;
     private Control? _contextMenu;
 
+    /// <summary>Set by ContainerPanel to enable deposit actions.</summary>
+    public ulong? ActiveContainerId { get; set; }
+    public string? ActiveContainerTable { get; set; }
+    public int ActiveContainerSlotCount { get; set; }
+
     public override void _Ready()
     {
         var header = UIFactory.MakeLabel("Inventory", 14, UIFactory.ColourAccent);
@@ -40,8 +45,13 @@ public partial class InventoryGrid : VBoxContainer
 
             btn.GuiInput += (evt) =>
             {
-                if (evt is InputEventMouseButton mb && mb.Pressed && mb.ButtonIndex == MouseButton.Right)
-                    ShowContextMenu(mb.GlobalPosition, itemId, itemQty);
+                if (evt is InputEventMouseButton mb && mb.Pressed)
+                {
+                    if (mb.ButtonIndex == MouseButton.Right)
+                        ShowContextMenu(mb.GlobalPosition, itemId, itemQty);
+                    else if (mb.ButtonIndex == MouseButton.Left && ActiveContainerId is not null)
+                        DepositToContainer(itemId, itemQty);
+                }
             };
 
             _grid.AddChild(btn);
@@ -101,6 +111,31 @@ public partial class InventoryGrid : VBoxContainer
             slotRow.AddChild(slotBtn);
         }
 
+        // Deposit buttons (when container is open)
+        if (ActiveContainerId is not null)
+        {
+            col.AddChild(UIFactory.MakeSeparator());
+
+            var dep1Btn = UIFactory.MakeButton("Deposit 1", 13, new Vector2(120, 32));
+            dep1Btn.Pressed += () =>
+            {
+                DepositToContainer(itemId, 1);
+                CloseContextMenu();
+            };
+            col.AddChild(dep1Btn);
+
+            if (itemQty > 1)
+            {
+                var depAllBtn = UIFactory.MakeButton($"Deposit All ({itemQty})", 13, new Vector2(120, 32));
+                depAllBtn.Pressed += () =>
+                {
+                    DepositToContainer(itemId, itemQty);
+                    CloseContextMenu();
+                };
+                col.AddChild(depAllBtn);
+            }
+        }
+
         col.AddChild(UIFactory.MakeSeparator());
 
         var drop1Btn = UIFactory.MakeButton("Drop 1", 13, new Vector2(120, 32));
@@ -125,6 +160,37 @@ public partial class InventoryGrid : VBoxContainer
         AddChild(_contextMenu);
     }
 
+    private void DepositToContainer(ulong itemId, uint qty)
+    {
+        if (ActiveContainerId is not { } cid || ActiveContainerTable is not { } table) return;
+
+        // Find the first open slot in the container
+        var usedSlots = new System.Collections.Generic.HashSet<int>();
+        foreach (var cs in GameManager.Instance.GetContainerSlots(cid))
+            if (!string.IsNullOrEmpty(cs.ItemType) && cs.Quantity > 0)
+                usedSlots.Add(cs.Slot);
+
+        // Prefer stacking onto matching item type first
+        string? itemType = null;
+        foreach (var inv in GameManager.Instance.GetMyInventory())
+            if (inv.Id == itemId) { itemType = inv.ItemType; break; }
+
+        int targetSlot = -1;
+        if (itemType != null)
+        {
+            foreach (var cs in GameManager.Instance.GetContainerSlots(cid))
+                if (cs.ItemType == itemType && cs.Quantity > 0) { targetSlot = cs.Slot; break; }
+        }
+        if (targetSlot < 0)
+        {
+            for (int i = 0; i < ActiveContainerSlotCount; i++)
+                if (!usedSlots.Contains(i)) { targetSlot = i; break; }
+        }
+        if (targetSlot < 0) return; // container full
+
+        GameManager.Instance.ContainerDeposit(cid, table, itemId, targetSlot, qty);
+    }
+
     private void CloseContextMenu()
     {
         _contextMenu?.QueueFree();
@@ -144,6 +210,19 @@ public partial class InventoryGrid : VBoxContainer
         "campfire" => new Color("#E55454"),
         "workbench" => new Color("#8B6040"),
         "chest" => new Color("#B8862B"),
+        "furnace" => new Color("#B34420"),
+        "crafting_table" => new Color("#D4A65A"),
+        "sign" => new Color("#C4A862"),
+        "raw_iron" => new Color("#7A6A5A"),
+        "iron_sword" => new Color("#BBBBDD"),
+        "health_potion" => new Color("#FF4444"),
+        "raw_meat" => new Color("#CC5555"),
+        "wolf_pelt" => new Color("#8A7A6A"),
+        "bread" => new Color("#D4A44A"),
+        "copper_coin" => new Color("#D4884A"),
+        "silver_coin" => new Color("#CCCCDD"),
+        "gold_coin" => new Color("#FFD700"),
+        "platinum_coin" => new Color("#E0E0F0"),
         "wood_pickaxe" => new Color("#9B7040"),
         "stone_pickaxe" => new Color("#777788"),
         "iron_pickaxe" => new Color("#AAAACC"),
