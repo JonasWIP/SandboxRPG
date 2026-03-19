@@ -45,12 +45,21 @@ client/obj/
 !client/addons/gdUnit4/bin/
 
 # =============================================
+# Godot UID files and addon imports (auto-generated)
+# =============================================
+*.uid
+client/addons/gdUnit4/**/*.import
+
+# =============================================
 # Logs / runtime artifacts
 # =============================================
 tools/game-mcp/godot.log
+*.stackdump
+client/reports/
 .superpowers/**/.server-info
 .superpowers/**/.server.log
 .superpowers/**/.server.pid
 
 # Git worktrees
 .worktrees/
+.claude/worktrees/
